@@ -12,6 +12,7 @@ import { mountThemeToggle } from './ui/theme.js';
 import { renderTargets } from './ui/targets.js';
 import { renderSettings } from './ui/settings.js';
 import { renderHorizonEditor } from './ui/horizoneditor.js';
+import { renderTonight } from './ui/nightgraph.js';
 
 const state = {
   // default = tonight; the night graph will hang off this once it lands.
@@ -68,23 +69,20 @@ function placeholder(title, blurb) {
 
 // Placeholder screens for the tabs whose features land in later build-order
 // steps (night graph, horizon editor, sites manager).
-const PLACEHOLDERS = {
-  '#/': () => placeholder('Tonight',
-    'The night graph: altitude-vs-time curves for your selected targets, cut by YOUR measured horizon, with twilight bands and sun/moon markers.'),
-  '#/sites': () => placeholder('Sites',
-    'Your named observing sites — each with its own coordinates and horizon profile — plus a switcher and JSON export/import.'),
-};
+// Sites is the last remaining placeholder (Step 7).
+const sitesPlaceholder = () => placeholder('Sites',
+  'Your named observing sites — each with its own coordinates and horizon profile — plus a switcher and JSON export/import.');
 
 function render() {
   const h = location.hash || '#/';
   renderTabs();
   window.scrollTo(0, 0);
-  // Live views own their async rendering into `app`; placeholders are synchronous.
+  // Live views own their async rendering into `app`.
   if (h.startsWith('#/targets')) return renderTargets(app, state, nav);
   if (h.startsWith('#/horizon')) return renderHorizonEditor(app, state, nav);
   if (h.startsWith('#/settings')) return renderSettings(app, state, nav);
-  const view = PLACEHOLDERS[h] || PLACEHOLDERS['#/'];
-  app.replaceChildren(view());
+  if (h.startsWith('#/sites')) return app.replaceChildren(sitesPlaceholder());
+  return renderTonight(app, state, nav); // '#/' and anything else
 }
 
 window.addEventListener('hashchange', render);
