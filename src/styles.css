@@ -249,3 +249,21 @@ a { color: var(--accent); }
 .loc-grid { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .loc-in { background: var(--bg2); border: 1px solid var(--line); color: var(--ink);
   border-radius: 8px; padding: 8px; font-size: 15px; }
+
+/* ── Visibility table (Tonight) ──────────────────────────────────────────── */
+.vis-section { margin: 14px 0 6px; }
+.vis-section h2 { font-family: var(--serif); }
+.vis-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.vis-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.vis-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.vis-main { flex: 1 1 auto; min-width: 0; }
+.vis-name { font-weight: 600; }
+.vis-sub { font-size: 12px; display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 1px; }
+.vis-sub .dim { font-family: var(--mono); }
+.vis-flag { font-family: var(--mono); font-size: 11px; color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent); border-radius: 999px; padding: 0 7px; }
+.vis-eff { flex: 0 0 auto; text-align: right; display: flex; flex-direction: column; gap: 1px; }
+.vis-eff-label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
+.vis-eff-win { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent-ink); }
+.vis-none { font-family: var(--mono); font-size: 12px; color: var(--dim); }

@@ -12,6 +12,8 @@
 import { el, clear } from './dom.js';
 import { makeObserver, altitudeCurve, moonAltAz, moonInfo } from '../model/astro.js';
 import { loadHorizon, isAbove, isFlat } from '../model/horizon.js';
+import { visibility } from '../model/visibility.js';
+import { activeInstrument } from '../model/instruments.js';
 import { loadCatalog, favoriteIds } from '../model/catalog.js';
 import { loadLocation, saveLocation, requestGeolocation } from '../model/location.js';
 import { nightWindow, sampleTwilight } from '../model/night.js';
@@ -76,7 +78,9 @@ export async function renderTonight(app, state, nav) {
   const readout = el('div.ng-readout', {}, hintText(profile));
   const legend = buildLegend(series, moonNow);
 
+  const instrument = activeInstrument();
   app.append(wrap, legend, readout,
+    visibilitySection(series, observer, profile, win, instrument),
     el('p.settings-foot', {}, win.polar
       ? 'The Sun stays up all “night” at this site/date — showing a fixed window.'
       : `Sunset ${hm(win.sunset)} · sunrise ${hm(win.sunrise)} (device time). Bright = above your horizon; faded = up but behind the treeline.`));
@@ -241,6 +245,42 @@ function buildLegend(series, moonNow) {
     ]),
   ]);
 }
+
+// The visibility table — from the same nightly computation, both the plain
+// rise/set and the effective "above MY horizon" window (emphasised), per target.
+function visibilitySection(series, observer, profile, win, instrument) {
+  const rows = series.map((s) => {
+    const v = visibility({ ra: s.target.ra, dec: s.target.dec }, observer, profile,
+      { start: win.start, end: win.end, instrument });
+    const eff = v.effective.map(fmtIv).join(', ');
+    const geo = v.geometric.length ? `${fmtIv(v.geometric[0], v.geometric)} up` : 'never up';
+    const flags = [];
+    if (v.clipsDeadZone) flags.push('clips zenith');
+    if (!isFlat(profile) && v.effective.length && v.geometric.length &&
+        totalEff(v.effective) < totalEff(v.geometric)) flags.push('trimmed by horizon');
+    return el('div.vis-row', {}, [
+      el('span.vis-dot', { style: `background:${s.color}` }),
+      el('div.vis-main', {}, [
+        el('div.vis-name', {}, s.target.common || s.target.name),
+        el('div.vis-sub', {}, [
+          el('span.dim', {}, geo),
+          v.transit ? el('span.dim', {}, ` · peak ${v.transit.altitude.toFixed(0)}°`) : null,
+          ...flags.map((f) => el('span.vis-flag', {}, f)),
+        ]),
+      ]),
+      el('div.vis-eff', {}, v.effective.length
+        ? [el('span.vis-eff-label', {}, 'above your horizon'), el('span.vis-eff-win', {}, eff)]
+        : [el('span.vis-none', {}, 'not clear tonight')]),
+    ]);
+  });
+  return el('section.vis-section', {}, [
+    el('h2', {}, 'Visibility tonight'),
+    el('p.dim.small', {}, 'Effective windows are when each target clears your treeline and stays below the mount’s zenith dead-zone — the times you can actually shoot it.'),
+    el('div.vis-list', {}, rows),
+  ]);
+}
+const fmtIv = (iv) => `${hm(iv.start)}–${hm(iv.end)}`;
+const totalEff = (list) => list.reduce((m, iv) => m + (iv.end - iv.start), 0);
 
 function hintText(profile) {
   return [el('span.dim.small', {}, isFlat(profile)
