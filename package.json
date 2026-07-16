@@ -1,0 +1,10 @@
+{
+  "name": "star-horizon-planner",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline-first astronomy planner built around a custom, per-site measured horizon.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
