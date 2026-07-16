@@ -1,0 +1,133 @@
+/* Horizon Planner — warm "Field Notebook" light theme + a first-class dark
+   "Night Mode" for use at the eyepiece. Fully variable-driven so the theme is a
+   token swap on [data-theme="dark"]. Mirrors the sibling apps' conventions:
+   :root tokens (never hex-in-place), IBM Plex with mono for every number. */
+:root {
+  --bg: #ebe1cf; --bg2: #f2ead9; --card: #faf4e8; --card2: #f2ead9;
+  --ink: #2c2318; --dim: #8a7b64; --line: #e2d6bf; --track: #e6dcc7;
+  --accent: #b07bd6; --accent-ink: #5a3580; --accent-wash: #efe4f6; --accent2: #7b57c4;
+  --slate: #3f77a4; --slate-wash: #dbe7f0; --warn: #a9781f; --live: #c0563a;
+  --danger: #9c3320; --danger-dim: #7a2e2e;
+  /* Tab dock — its own neutral surface with light glyphs, so it can't be
+     mistaken for the cards or the page in either theme. */
+  --dock: #6a5f7e;
+  --dock-line: #4c4360;
+  --dock-shadow: 0 1px 2px rgba(30,20,40,.22), 0 8px 18px rgba(30,20,40,.18), 0 22px 44px rgba(30,20,40,.24);
+  --dock-lip: inset 0 1px 0 rgba(255,255,255,.16);
+  --tab-ink: #efe6f4;
+  --tab-ink-active: #d9b8f5;
+  /* Type superfamily — IBM Plex (serif = wordmark/titles, sans = chrome,
+     mono = every number). */
+  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --serif: 'IBM Plex Serif', Georgia, "Times New Roman", serif;
+  --mono: 'IBM Plex Mono', ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 16px; --tab-h: 60px;
+  --col-edge: max(10px, (100% - 760px) / 2 + 12px);
+}
+
+/* Night Mode — a deep, low-glare palette for the field (never green). */
+[data-theme="dark"] {
+  --bg: #12131c; --bg2: #1c1e2c; --card: #191b28; --card2: #23263a;
+  --ink: #e9ecf7; --dim: #9aa0bd; --line: #2a2d40; --track: #23263a;
+  --accent: #c39be8; --accent-ink: #e6d4f6; --accent-wash: #2a2140; --accent2: #b48ce0;
+  --slate: #7fb0da; --slate-wash: #1e2c38; --warn: #e0a94e; --live: #e8795a;
+  --danger: #e58b8b; --danger-dim: #7a2e2e;
+  --dock: #35304a;
+  --dock-line: #4a4468;
+  --dock-shadow: 0 1px 2px rgba(0,0,0,.45), 0 8px 20px rgba(0,0,0,.5), 0 22px 46px rgba(0,0,0,.55);
+  --dock-lip: inset 0 1px 0 rgba(255,255,255,.08);
+  --tab-ink: #d7d2e8;
+  --tab-ink-active: #c39be8;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.45; }
+/* Clear the floating dock: its height + 10px float + a little breathing room. */
+body { padding-bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); }
+.view { max-width: 760px; margin: 0 auto; padding: 12px 12px 24px; }
+
+h1 { font-size: 22px; margin: 0; font-family: var(--serif); font-weight: 600; }
+h2 { font-size: 16px; margin: 0 0 6px; }
+h3 { font-size: 14px; margin: 14px 0 4px; }
+a { color: var(--accent); }
+.dim { color: var(--dim); }
+.small { font-size: 12px; }
+.empty { color: var(--dim); text-align: center; padding: 40px 0; }
+
+/* Numbers are IBM Plex Mono, tabular — wherever they land later. */
+.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Placeholder / scaffold views — honest "coming soon" rather than a blank. */
+.placeholder { background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 22px 18px; margin: 10px 0; }
+.placeholder h1 { margin-bottom: 8px; }
+.placeholder p { margin: 0 0 12px; max-width: 52ch; }
+.scaffold-note { display: inline-block; font-family: var(--mono); font-size: 12px;
+  color: var(--accent-ink); background: var(--accent-wash);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 999px; padding: 4px 12px; }
+
+/* buttons */
+.btn { background: var(--card2); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer;
+  text-decoration: none; display: inline-block; }
+.btn.ghost { background: none; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #12131c; font-weight: 700; }
+.btn:active { transform: translateY(1px); }
+
+/* toast (undo notices etc.) */
+.toast { position: fixed; left: 50%; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 26px);
+  transform: translate(-50%, 8px); max-width: 88vw; padding: 10px 16px; z-index: 20;
+  background: var(--card2); color: var(--ink); border: 1px solid var(--accent2); border-radius: 999px;
+  font-size: 13px; box-shadow: 0 8px 26px rgba(0, 0, 0, .45); opacity: 0; transition: opacity .25s, transform .25s;
+  pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.has-action { display: inline-flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; pointer-events: auto; }
+.toast-action { flex: 0 0 auto; background: var(--accent); color: #12131c; border: 0; border-radius: 999px;
+  padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.toast-action:active { transform: translateY(1px); }
+
+/* tab bar — a floating dock in the same card language as the content. */
+.tabs { position: fixed; bottom: calc(10px + env(safe-area-inset-bottom)); left: 0; right: 0;
+  margin-inline: auto; width: min(736px, calc(100% - 24px)); height: var(--tab-h);
+  background: color-mix(in srgb, var(--dock) 97%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(1.04); backdrop-filter: blur(12px) saturate(1.04);
+  border: 1px solid var(--dock-line); border-radius: var(--r); overflow: hidden;
+  box-shadow: var(--dock-shadow), var(--dock-lip);
+  display: grid; grid-template-columns: repeat(5, 1fr); z-index: 10; }
+.tab { background: none; border: 0; color: var(--tab-ink); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-size: 11px; }
+.tab.active { color: var(--tab-ink-active); }
+.tab-icon { display: flex; align-items: center; justify-content: center; line-height: 0; }
+
+/* Floating corner buttons hug the content column on wide screens, fall back to
+   the screen corner on narrow ones. */
+.about-btn { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: var(--col-edge); z-index: 8;
+  width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card2); color: var(--dim); font-size: 15px; line-height: 1; cursor: pointer;
+  display: grid; place-content: center; opacity: .55; transition: opacity .15s, color .15s, border-color .15s; }
+.about-btn:hover, .about-btn:focus-visible { opacity: 1; color: var(--accent); border-color: var(--accent); outline: none; }
+.about-btn:active { transform: translateY(1px); }
+
+/* Night Mode toggle — floating moon/sun, just left of the About button. */
+.theme-btn { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(var(--col-edge) + 38px); z-index: 8;
+  width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card2); color: var(--dim); cursor: pointer;
+  display: grid; place-content: center; opacity: .55; transition: opacity .15s, color .15s, border-color .15s; }
+.theme-btn:hover, .theme-btn:focus-visible { opacity: 1; color: var(--accent); border-color: var(--accent); outline: none; }
+.theme-btn:active { transform: translateY(1px); }
+.theme-btn svg { display: block; }
+
+/* about modal */
+.about-dialog { position: fixed; inset: 0; margin: auto; width: min(92vw, 560px); max-height: 84vh;
+  padding: 0; overflow: hidden; background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.about-dialog::backdrop { background: rgba(10,8,16,.55); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+.about-body { padding: 22px 22px 8px; overflow-y: auto; max-height: calc(84vh - 64px); }
+.about-body h2 { font-family: var(--serif); font-size: 19px; }
+.about-body p { max-width: 52ch; color: var(--ink); }
+.about-scaffold { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+.about-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px 16px;
+  border-top: 1px solid var(--line); }

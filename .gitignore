@@ -1,0 +1,10 @@
+# Dependencies (none committed — no-build vanilla ES modules; astronomy-engine
+# is vendored directly under src/vendor/).
+node_modules/
+
+# Secrets / local
+.env
+*.local
+
+# OS / editor cruft
+.DS_Store

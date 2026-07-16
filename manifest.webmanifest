@@ -1,0 +1,15 @@
+{
+  "name": "Horizon Planner — astronomy planning around your real sky",
+  "short_name": "Horizon",
+  "description": "Plan your night against a custom, per-site, physically-measured horizon — not a flat 0° minimum. Instrument-agnostic, offline-first.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12131c",
+  "theme_color": "#12131c",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "./apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}
