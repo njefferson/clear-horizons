@@ -37,6 +37,30 @@ how many mosaic panels / framing overlay" answer reads from the active instrumen
 (Done: the repo is `star-horizon-planner`, and storage standardized on a
 neutral `horizon.*` prefix in the scaffold — NOT `s50.*` as first drafted.)
 
+## Accessibility — owner's standing order (TOP PRIORITY)
+Accessibility outranks features. These are FAIL STATES, not style preferences:
+- **Meaning carried by color alone.** Color-blind-inconsiderate design fails
+  review, full stop. Every encoding pairs color with a second channel — shape,
+  text, pattern, weight, position. Any categorical palette (chart series,
+  status sets) must PASS a CVD validation run — **computed, never eyeballed** —
+  before it ships, with the validator output quoted in the commit message.
+- **Contrast below WCAG 2.2 AA** (4.5:1 text, 3:1 non-text/UI). Enforced by
+  `node scripts/check-contrast.mjs` in CI; a token change that fails does not
+  merge. New color pairs get added to that script's pair list, not waved past.
+- **A pointer-only interaction.** Every interaction has a keyboard path and a
+  visible focus indicator. (The night-graph scrub is tolerated only because
+  the visibility table carries the same data in text.)
+- **Silent async feedback.** Toasts and discrete readouts announce via
+  aria-live/role=status. Continuous 60 Hz streams stay silent BY DESIGN —
+  announcing them is its own accessibility failure; give them a textual
+  summary instead.
+- **Disabled zoom, ignored motion preferences.** The viewport stays zoomable;
+  `prefers-reduced-motion` is honored.
+Design gate: **every build-order step in this file names its accessibility
+consideration before code is written**, and the Verification gates below run
+per step. Screen-reader spot checks (VoiceOver on the iPad) join the
+NEEDS-HIS-HANDS device pass.
+
 ## Reuse map — copy from `Bird-location-scouting/frame/`
 The bird app is the structural template. Reuse near-verbatim:
 - **`src/ui/dom.js`** — `el()` (null-safe hyperscript), `clear()`, `toast()` (Undo
@@ -285,6 +309,12 @@ NEEDS-HIS-HANDS half; the smoke pass drives the whole flow synthetically):**
 | Polar reticle | Polar Scope Align, PS Align Pro | **horizon-aware** ("can I see the pole?") + unified |
 
 ## Verification (owner culture: verify before claiming fixed)
+- **Accessibility gates (standing order, see above):** `node
+  scripts/check-contrast.mjs` (pure Node, runs in CI) must pass; `npm run
+  test:a11y` (axe-core over every view × both themes, headless Chromium) must
+  report ZERO violations before a release ships; any new categorical palette
+  is CVD-validated with the output quoted in the commit. Color decisions are
+  computed, never eyeballed.
 - **Node headless unit tests** for `astro.js`, `horizon.js`, `visibility.js` (alt/az
   vs. known ephemeris; horizon sample-at-azimuth interpolation; window intersection
   incl. wrap-around midnight). Make each test **fail once** before trusting it.
