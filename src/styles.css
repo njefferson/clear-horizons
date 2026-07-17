@@ -167,9 +167,16 @@ a { color: var(--accent); }
 .settings-block { margin: 14px 0 20px; }
 .settings-block h2 { font-family: var(--serif); }
 .inst-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 8px; }
-.inst-card { text-align: left; background: var(--card); border: 1px solid var(--line);
-  border-radius: 12px; padding: 12px 14px; cursor: pointer; color: var(--ink); }
+.inst-card { background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; display: flex; flex-direction: column; }
 .inst-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.inst-pick { text-align: left; background: none; border: 0; padding: 12px 14px;
+  cursor: pointer; color: var(--ink); flex: 1 1 auto; border-radius: 12px; }
+.inst-card-actions { display: flex; justify-content: flex-end; padding: 0 10px 10px; }
+.sensor-row { display: flex; gap: 8px; }
+.sensor-row .fld { flex: 1 1 0; min-width: 0; }
+.fov-preview { font-family: var(--mono); margin: 0; }
+.toggle-row.small-gap { font-size: 13px; }
 .inst-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .inst-name { font-weight: 600; font-size: 15px; }
 .inst-active { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
