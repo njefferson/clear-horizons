@@ -58,10 +58,29 @@ jobs:
             prod=$((prod + $(echo "$batch" | jq '[.[] | select(.environment=="production")] | length')))
             page=$((page + 1))
           done
-          echo "Total deployments: $total  (preview: $previews, production: $prod)"
+          echo "Project '$PROJECT' — total deployments: $total  (preview: $previews, production: $prod)"
 
           if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "Dry run — would delete the $previews preview deployment(s); the $prod production deployment(s) are kept."
+            echo
+            echo "=== Diagnostic: all Pages projects in this account and their deployment counts ==="
+            PROJ_API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects"
+            names=$(curl -s "${auth[@]}" "$PROJ_API?per_page=100" | jq -r '.result[]?.name')
+            if [ -z "$names" ]; then
+              echo "(no Pages projects visible to this token/account)"
+              echo "Raw projects response (first 400 chars):"
+              curl -s "${auth[@]}" "$PROJ_API?per_page=100" | head -c 400; echo
+            fi
+            for pj in $names; do
+              c=0; p=1
+              while :; do
+                m=$(curl -s "${auth[@]}" "$PROJ_API/$pj/deployments?per_page=100&page=$p" | jq '.result // [] | length')
+                [ "$m" -eq 0 ] && break
+                c=$((c + m)); p=$((p + 1))
+              done
+              echo "  $pj: $c deployments"
+            done
+            echo
+            echo "Dry run — would delete the $previews preview deployment(s) in '$PROJECT'; the $prod production deployment(s) are kept."
             exit 0
           fi
 
