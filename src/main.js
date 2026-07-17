@@ -14,7 +14,7 @@ import { renderSites } from './ui/sites.js';
 import { renderPolar } from './ui/polar.js';
 import { renderCapture } from './ui/capture.js';
 import { renderLiveCapture } from './ui/livecapture.js';
-import { loadSites, requestPersistence } from './model/sites.js';
+import { loadSites, requestPersistence, ensureDefaultSite } from './model/sites.js';
 
 const state = {
   // default = tonight; the night graph will hang off this once it lands.
@@ -120,6 +120,7 @@ window.addEventListener('hashchange', () => render(true));
 (function boot() {
   mountAbout();        // floating "about" button, available everywhere
   mountThemeToggle();  // floating moon/sun Night Mode toggle, everywhere
+  ensureDefaultSite(); // always have an active site → open into the sky, not a wall
   render();
   booted = true;       // subsequent navigations move focus to the view heading
   // Existing data (sites/horizons predating this call) deserves protection

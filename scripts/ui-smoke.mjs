@@ -90,7 +90,7 @@ const tab = (label) => page.click(`.tab:has-text("${label}")`);
 const shot = async (name) => { if (SHOTS) await page.screenshot({ path: join(SHOTS, name) }); };
 
 // --- the journey ---------------------------------------------------------------
-await step('boot: 6 tabs, Tonight shows the no-site gate (honest first run)', async () => {
+await step('boot: 6 tabs, Tonight opens into the sky at the seeded default site', async () => {
   // domcontentloaded: the window 'load' event hangs on the external font
   // <link> in offline sandboxes; the app itself is fully local.
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
@@ -102,15 +102,17 @@ await step('boot: 6 tabs, Tonight shows the no-site gate (honest first run)', as
   ok(rows === 1, `all tabs on one dock row (got ${rows} rows)`);
   // Exactly one tab marks itself the current page for assistive tech.
   ok(await page.$$eval('.tab[aria-current="page"]', (e) => e.length) === 1, 'active tab has aria-current="page"');
-  await page.waitForSelector('.dead-end');
-  const gate = await page.$eval('.dead-end h2', (e) => e.textContent);
-  ok(/observing site/i.test(gate), `Tonight gate says: ${gate}`);
+  // No create-a-site wall: a default "Here" site is seeded so Tonight shows the
+  // sky right away, with a one-tap "Use my location" nudge (location is approx).
+  await page.waitForSelector('.ng-approx');
+  ok(/use my location/i.test(await page.$eval('.ng-approx', (e) => e.textContent)), 'approx-location nudge offers one-tap geolocation');
+  ok(!(await page.$('.dead-end')), 'Tonight is not a dead-end on first run');
 });
 
-await step('horizon: gated too before any site exists', async () => {
+await step('horizon: the seeded site opens the editor (no create-a-site wall)', async () => {
   await tab('Horizon');
-  await page.waitForSelector('.dead-end');
-  ok(/no site yet/i.test(await page.$eval('.dead-end h2', (e) => e.textContent)), 'Horizon gate');
+  await page.waitForSelector('.hz-handle');
+  ok(!(await page.$('.dead-end')), 'Horizon opens the editor, not a gate');
 });
 
 await step('sites: add a site via the dialog; it lists and becomes active', async () => {
@@ -146,7 +148,9 @@ await step('horizon editor: Stellarium import (keeps the file\'s density)', asyn
 });
 
 await step('capture: synthetic sensor sweep bins, covers the circle, saves', async () => {
-  await page.click('.hz-actions .btn:has-text("Measure")');
+  // "Measure" now opens the live camera; the sensor sweep is the no-camera
+  // backup, reached directly (or via "No-camera mode" from the camera view).
+  await page.evaluate(() => { location.hash = '#/capture'; });
   await page.waitForSelector('.cap-live');
   await page.click('.pa-card .btn:has-text("Enable compass")');
   await page.click('#cap-rec'); // Record (uncalibrated → raw-headings toast, offset 0)
@@ -205,7 +209,9 @@ await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep save
       }));
     }
   });
-  await page.click('#lc-rec'); // Stop
+  // Recording auto-stops at a full circle — no manual Stop, and no angry second
+  // lap. Wait for the button to fall back to "Record".
+  await page.waitForFunction(() => /Record/.test(document.querySelector('#lc-rec')?.textContent || ''));
   const cov = await page.$eval('#lc-cov', (e) => e.textContent);
   ok(/ 100% /.test(cov), `full-circle coverage over the camera path: ${cov}`);
   const readout = await page.$eval('#lc-readout', (e) => e.textContent);

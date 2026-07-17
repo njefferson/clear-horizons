@@ -52,14 +52,15 @@ export function renderCapture(app, state, nav) {
   root = el('div.cap-root');
   root.append(
     el('div.pa-head', {}, [
-      el('h1', {}, 'Measure horizon'),
-      el('p.dim.small', {}, 'Hold the phone upright and point the back camera at the treeline, the way you’d photograph it. Tip it up for a tall obstruction, down for a downhill horizon — the altitude readout follows where the camera looks.'),
-      el('p.dim.small', {}, 'This is a camera-aiming task. If you can’t sight it visually, set your horizon in the Horizon editor (drag or arrow keys) or import a Stellarium file — both reach the same result.'),
+      el('h1', {}, 'Measure horizon — no-camera backup'),
+      el('div.card-actions', {}, [
+        el('button.btn.primary', { onclick: () => nav.go('#/capture/live'), 'aria-label': 'Open the live-camera capture (recommended)' }, '📷 Use the live camera instead'),
+      ]),
+      el('p.dim.small', {}, 'This is the fallback for when the camera can’t be used. Hold the phone upright and aim the back camera at the treeline (no preview here); tip it up for a tall obstruction, down for a downhill horizon — the altitude readout follows where it looks.'),
+      el('p.dim.small', {}, 'You can also set the horizon in the Horizon editor (drag or arrow keys) or import a Stellarium file — both reach the same result.'),
       el('div.row-actions', {}, [
         el('button.chip.ng-site', { onclick: () => nav.go('#/sites'), 'aria-label': `Site: ${site.name} — change` },
           [el('span', { 'aria-hidden': 'true' }, `📍 ${site.name}`)]),
-        el('button.chip', { onclick: () => nav.go('#/capture/live'), 'aria-label': 'Open the live-camera horizon capture' },
-          [el('span', { 'aria-hidden': 'true' }, '📷 Live camera')]),
       ]),
     ]),
     sensorsCard(),
@@ -68,15 +69,25 @@ export function renderCapture(app, state, nav) {
     applyCard(site, nav),
   );
   app.append(root);
+  window.addEventListener('hashchange', onCapLeave);
   repaint();
+}
+
+// Leaving the sensor view (including into the live camera) turns sensors off so
+// they never keep running in the background or hold the motion sensors away
+// from the camera.
+function onCapLeave() {
+  const onSensorView = location.hash.startsWith('#/capture') && !location.hash.startsWith('#/capture/live');
+  if (!onSensorView) { window.removeEventListener('hashchange', onCapLeave); if (cap.enabled) disableSensors(); }
 }
 
 // --- 1 · sensors --------------------------------------------------------------
 function sensorsCard() {
-  const enableBtn = el('button.btn.primary', { id: 'cap-enable', onclick: enableSensors },
-    cap.enabled ? 'Sensors on' : 'Enable compass & tilt');
+  const enableBtn = el('button.btn.primary', { id: 'cap-enable', onclick: () => (cap.enabled ? disableSensors() : enableSensors()) },
+    cap.enabled ? 'Turn off sensors' : 'Enable compass & tilt');
   return el('section.pa-card', {}, [
-    el('h2', {}, '1 · Sensors'),
+    el('h2', {}, '1 · Sensors (no-camera backup)'),
+    el('p.dim.small', {}, 'The live camera is the main way in; this sensor sweep is the backup for when the camera can’t be used.'),
     el('div.cap-live', {}, [
       el('span.cap-az.mono', { id: 'cap-az' }, '—'),
       el('span.cap-alt.mono', { id: 'cap-alt' }, '—'),
@@ -84,6 +95,17 @@ function sensorsCard() {
     el('p.dim.small', { id: 'cap-src' }, cap.enabled ? sourceNote() : 'Compass and tilt are off until you enable them.'),
     el('div.card-actions', {}, [enableBtn]),
   ]);
+}
+
+// Detach the orientation listeners and stop recording. Sensors must actually
+// switch OFF — both on demand and when leaving the view — so they can't keep
+// running in the background or hold the motion sensors away from the camera.
+function disableSensors() {
+  window.removeEventListener('deviceorientationabsolute', onOrientation);
+  window.removeEventListener('deviceorientation', onOrientation);
+  cap.enabled = false;
+  cap.recording = false;
+  repaint();
 }
 
 async function enableSensors() {
@@ -249,7 +271,7 @@ function repaint() {
   set('cap-cov', covText());
   set('cap-preview', previewText());
   const enable = root.querySelector('#cap-enable');
-  if (enable) enable.textContent = cap.enabled ? 'Sensors on' : 'Enable compass & tilt';
+  if (enable) enable.textContent = cap.enabled ? 'Turn off sensors' : 'Enable compass & tilt';
   const rec = root.querySelector('#cap-rec');
   if (rec) { rec.textContent = cap.recording ? '■ Stop' : '● Record'; rec.setAttribute('aria-label', cap.recording ? 'Stop recording' : 'Record sweep'); rec.classList.toggle('rec', cap.recording); }
   const strip = root.querySelector('#cap-strip');

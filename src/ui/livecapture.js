@@ -219,20 +219,36 @@ function onReticleKey(e) {
 }
 
 // --- record / mark / calibrate / save ----------------------------------------
+// Reflect recording state onto the button — shared by the toggle and auto-stop.
+function paintRecBtn() {
+  const rec = root && root.querySelector('#lc-rec');
+  if (rec) {
+    rec.textContent = lc.recording ? '■ Stop' : '● Record';
+    rec.setAttribute('aria-label', lc.recording ? 'Stop recording' : 'Record sweep');
+    rec.classList.toggle('rec', lc.recording);
+  }
+}
+
 function toggleRecording() {
   if (!lc) return;
   // Arm before the first compass read is fine — samples start when it arrives.
   if (!lc.recording && !lc.cam) say('Armed — recording begins once the compass reads. Enable motion access if nothing happens.');
   else if (!lc.recording && !lc.calibrated) say('Recording with RAW magnetic headings — calibrate against the Sun for true north.');
   lc.recording = !lc.recording;
-  const rec = root.querySelector('#lc-rec');
-  if (rec) {
-    rec.textContent = lc.recording ? '■ Stop' : '● Record';
-    rec.setAttribute('aria-label', lc.recording ? 'Stop recording' : 'Record sweep');
-    rec.classList.toggle('rec', lc.recording);
-  }
+  paintRecBtn();
   updateCoverage();
-  say(lc.recording ? 'Recording — sweep the treeline.' : `Stopped. ${covText()}`);
+  say(lc.recording ? 'Recording — sweep the treeline; it stops itself at a full circle.' : `Stopped. ${covText()}`);
+}
+
+// One full loop is enough. Auto-stop at complete coverage so you can edit or
+// save instead of manually stopping — and so a second lap can't pile on.
+function maybeAutoStop() {
+  if (!lc || !lc.recording) return;
+  if (coverage(lc.session).pct >= 100) {
+    lc.recording = false;
+    paintRecBtn();
+    say('Full circle captured — nudge the reticle and Mark to fix any spot, or Save. (Reset to redo.)');
+  }
 }
 
 function markPoint() {
@@ -278,6 +294,7 @@ function tickDraw(canvas) {
   draw(canvas);
   updateReadout();
   updateCoverage(); // keep the numeric coverage live through a sweep
+  maybeAutoStop();  // one full loop is enough — stop so you can edit, not keep spinning
   lc.raf = requestAnimationFrame(() => tickDraw(canvas));
 }
 

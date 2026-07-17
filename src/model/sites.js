@@ -42,8 +42,29 @@ function normalizeSite(s) {
     lat: clampLat(s.lat),
     lon: wrapLon(s.lon),
     elevation_m: Number.isFinite(s.elevation_m) ? s.elevation_m : 0,
+    // `approx` marks a placeholder location (the seeded default) so the UI can
+    // nudge "set your real location". Cleared the moment coords are geolocated
+    // or hand-entered. Carried through serialize/load like any other field.
+    approx: !!s.approx,
     horizon: normalizeHorizon(s.horizon),
   };
+}
+
+// An honest placeholder: the geographic centre of the contiguous US. Good enough
+// to show *a* sky tonight; obviously refineable with one tap on "Use my location".
+export const DEFAULT_COORDS = { lat: 39.83, lon: -98.58 };
+
+/**
+ * Guarantee an active site exists so the app opens straight into the sky rather
+ * than a create-a-site wall. If none exist, seed a placeholder "Here" marked
+ * approximate. Returns the active site. Idempotent — a no-op once any site
+ * exists, so real users are never touched.
+ */
+export function ensureDefaultSite() {
+  if (loadSites().length) return activeSite();
+  const s = addSite({ name: 'Here', lat: DEFAULT_COORDS.lat, lon: DEFAULT_COORDS.lon, approx: true });
+  setActiveSite(s.id);
+  return s;
 }
 
 /** All sites, migrating legacy single-location data once if present. */

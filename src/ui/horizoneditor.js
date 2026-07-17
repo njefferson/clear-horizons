@@ -165,7 +165,7 @@ export function renderHorizonEditor(app, state, nav) {
   const actions = el('div.hz-actions', {}, [
     el('button.chip.ng-site', { onclick: () => nav.go('#/sites'), 'aria-label': `Site: ${site.name} — change` },
       [el('span', { 'aria-hidden': 'true' }, `📍 ${site.name}`)]),
-    el('button.btn.primary', { onclick: () => nav.go('#/capture'), 'aria-label': 'Measure horizon with the phone sensors' }, '📡 Measure…'),
+    el('button.btn.primary', { onclick: () => nav.go('#/capture/live'), 'aria-label': 'Measure horizon with the live camera' }, '📷 Measure…'),
     el('button.btn', { onclick: () => { if (confirm('Reset the horizon to a flat 0°?')) { profile.points = [{ az: 0, alt: 0 }]; persist(); redraw(); toast('Horizon reset to flat.'); } } }, 'Reset'),
     el('button.btn', { onclick: () => openImport(profile, redraw, persist) }, 'Import…'),
     el('button.btn', { onclick: () => exportStellarium(profile, site.name) }, 'Export'),
@@ -177,7 +177,7 @@ export function renderHorizonEditor(app, state, nav) {
     el('p.dim.small', {}, `Drag each point to the top of the trees or hills blocking that direction from ${site.name}. Everything above this line is what you can actually see.`),
     el('div.hz-wrap', {}, [svg]),
     actions,
-    el('p.settings-foot', {}, 'Saved to this site. Measure… sweeps the real treeline with the phone’s sensors.'),
+    el('p.settings-foot', {}, 'Saved to this site. Measure… traces the real treeline through the live camera (with a no-camera sensor mode and this editor as backups).'),
   );
   redraw();
 }

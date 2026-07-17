@@ -270,6 +270,30 @@ NEEDS-HIS-HANDS. Accessibility note (standing order): the reticle needs a
 keyboard/manual-entry equivalent, and the AR bar-graph carries a text/numeric
 readout — the camera overlay is never the sole channel.
 
+**Camera is the ONE way in (device pass, 2026-07-17).** "Measure…" (Horizon
+editor) now opens the live camera directly; the no-camera sensor sweep and the
+manual editor are explicitly the *backups*, reached from inside it. The sweep
+**auto-stops at a full circle** — you don't hunt for Stop and a second lap can't
+pile on; then you nudge/Mark to fix spots or Save. Sensors must actually switch
+OFF (a button, and automatically on leaving the view) so they can't keep running
+or hold the motion sensors away from the camera.
+
+## First run — open into the sky, not a wall (device pass, 2026-07-17)
+The old flow was backwards: Tonight → "add a site" → a lat/long form → back to
+Tonight → "no targets" → Targets. A newcomer hit three walls before seeing a
+single star. Fixed to Noah's ordering — **location → sky → (horizon refines) →
+tools:**
+- A default **"Here"** site is seeded at boot (centre-US placeholder, marked
+  `approx`) so there is always an active site and the app opens straight onto
+  the night graph. Real users with sites are untouched (seed is a no-op).
+- Tonight shows a one-tap **"Use my location"** (geolocation → updates the site
+  in place, clears `approx`) right in the header — no trip into Sites, no typing
+  coordinates. Sites still has the manual lat/long + geolocation for named spots.
+- With nothing favourited yet, Tonight previews **tonight's brightest showpieces
+  above the horizon** (via `visibleTonight`) instead of a dead-end, with a link
+  to pick your own. Horizon is applied but forgiving; refining it sharpens the
+  same view. Everything downstream (favourites, capture, polar) layers on top.
+
 **Build order — STARTED (first increment built, awaiting the on-device pass):**
 - **L1** `model/arproject.js` (100% headless): the world↔image-plane projection
   under the overlay. Linear (equirectangular) map — accurate enough for a

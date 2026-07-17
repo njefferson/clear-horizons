@@ -9,14 +9,32 @@
 // Two stacked canvases: a base (bands/grid/curves, repainted on data change)
 // and a light overlay (just the scrub cursor) so scrubbing stays cheap.
 // =============================================================================
-import { el, clear } from './dom.js';
+import { el, clear, toast } from './dom.js';
 import { makeObserver, altitudeCurve, moonAltAz, moonInfo, moonSeparation } from '../model/astro.js';
 import { makeHorizon, isAbove, isFlat } from '../model/horizon.js';
-import { visibility } from '../model/visibility.js';
+import { visibility, visibleTonight } from '../model/visibility.js';
 import { activeInstrument } from '../model/instruments.js';
 import { loadCatalog, favoriteIds, shortName } from '../model/catalog.js';
-import { activeSite } from '../model/sites.js';
-import { nightWindow, sampleTwilight } from '../model/night.js';
+import { activeSite, updateSite } from '../model/sites.js';
+import { nightWindow, darkWindow, sampleTwilight } from '../model/night.js';
+
+const HIGHLIGHTS = 6; // brightest targets to preview when nothing is favourited yet
+
+/** One-tap geolocation → update the active site in place, then repaint. */
+function useMyLocation(nav) {
+  if (!navigator.geolocation) { toast('Location isn’t available on this device — set it in Sites.'); return; }
+  toast('Locating…');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const s = activeSite();
+      if (s) updateSite(s.id, { lat: pos.coords.latitude, lon: pos.coords.longitude, approx: false, name: s.approx ? 'Here' : s.name });
+      toast('Location set — showing your sky.');
+      nav.rerender();
+    },
+    () => toast('Location permission denied — you can type coordinates in Sites.'),
+    { maximumAge: 600000, timeout: 8000 },
+  );
+}
 
 const H = 320;                    // graph height, CSS px
 const M = { l: 32, r: 12, t: 12, b: 24 };
@@ -49,21 +67,32 @@ export async function renderTonight(app, state, nav) {
   try { objects = await loadCatalog(); } catch { clear(app); app.append(el('h1', {}, 'Tonight'), deadEnd('Catalog unavailable', 'Reopen once online to cache it.')); return; }
   if ((location.hash || '#/') !== '#/' && !location.hash.startsWith('#/tonight')) return;
 
-  const favIds = favoriteIds();
-  const targets = objects.filter((o) => favIds.has(o.id)).slice(0, MAX_TARGETS);
-  clear(app);
-  app.append(header(state, nav, site, targets.length, favIds.size));
-
-  if (!targets.length) {
-    app.append(deadEnd('No targets picked yet',
-      'Star a few objects in Targets and they’ll be plotted here — each curve cut by your measured horizon.',
-      { label: 'Go to Targets', onClick: () => nav.go('#/targets') }));
-    return;
-  }
-
   const observer = makeObserver(site.lat, site.lon, site.elevation_m || 0);
   const profile = makeHorizon(site.horizon);
   const win = nightWindow(observer, state.night);
+
+  const favIds = favoriteIds();
+  let targets = objects.filter((o) => favIds.has(o.id)).slice(0, MAX_TARGETS);
+
+  // The whole point of opening the app is "what's up above me tonight" — so
+  // even before you've starred anything, preview tonight's brightest showpieces
+  // that clear your horizon during dark hours. Starring your own supersedes it.
+  let previewing = false;
+  if (!targets.length) {
+    const upIds = visibleTonight(objects, observer, profile, { window: darkWindow(observer, state.night), instrument: activeInstrument() });
+    const up = objects.filter((o) => upIds.has(o.id) && o.mag != null).sort((a, b) => a.mag - b.mag);
+    targets = (up.length ? up : objects.filter((o) => o.mag != null).sort((a, b) => a.mag - b.mag)).slice(0, HIGHLIGHTS);
+    previewing = targets.length > 0;
+  }
+
+  clear(app);
+  app.append(header(state, nav, site, targets.length, favIds.size, previewing));
+
+  if (!targets.length) { // only if the catalog itself is empty — a real dead end
+    app.append(deadEnd('Catalog is empty', 'Reopen once online to cache the object catalog.'));
+    return;
+  }
+
   const twilight = sampleTwilight(observer, win.start, win.end, STEP_MIN);
 
   // Per-target series with per-sample horizon visibility.
@@ -347,8 +376,8 @@ function drawScrub(ctx, s, ms, series, profile, observer, readout) {
 }
 
 // --- header / gates / legend ------------------------------------------------
-function header(state, nav, site, shown, favCount) {
-  const label = site.name || `${site.lat.toFixed(2)}, ${site.lon.toFixed(2)}`;
+function header(state, nav, site, shown, favCount, previewing) {
+  const label = site.approx ? 'Here (approx)' : (site.name || `${site.lat.toFixed(2)}, ${site.lon.toFixed(2)}`);
   return el('div.ng-head', {}, [
     el('div.ng-head-top', {}, [el('h1', {}, 'Tonight')]),
     el('div.ng-datenav', {}, [
@@ -358,7 +387,16 @@ function header(state, nav, site, shown, favCount) {
       el('button.chip.ng-site', { onclick: () => nav.go('#/sites'), 'aria-label': `Site: ${label} — change` },
         [el('span', { 'aria-hidden': 'true' }, `📍 ${label}`)]),
     ]),
-    favCount > shown ? el('p.dim.small', {}, `Showing ${shown} of ${favCount} favourites (first ${MAX_TARGETS}).`) : null,
+    // Approximate seeded location → make setting the real one a one-tap job,
+    // right here, instead of a trip into Sites and a lat/long form.
+    site.approx ? el('div.ng-approx', { role: 'status' }, [
+      el('span.dim.small', {}, 'Approximate location. For your real sky:'),
+      el('button.btn.small.primary', { onclick: () => useMyLocation(nav) }, '📍 Use my location'),
+    ]) : null,
+    previewing
+      ? el('p.dim.small', {}, ['Tonight’s brightest showpieces above your horizon. ',
+          el('button.linklike', { onclick: () => nav.go('#/targets') }, 'Pick your own in Targets'), '.'])
+      : (favCount > shown ? el('p.dim.small', {}, `Showing ${shown} of ${favCount} favourites (first ${MAX_TARGETS}).`) : null),
   ]);
 }
 
