@@ -50,7 +50,7 @@ jobs:
           # Tally every deployment across all pages (report + dry-run basis).
           total=0; previews=0; prod=0; page=1
           while :; do
-            batch=$(curl -s "${auth[@]}" "$API?per_page=100&page=$page" | jq -c '.result // []')
+            batch=$(curl -s "${auth[@]}" "$API?per_page=25&page=$page" | jq -c '.result // []')
             n=$(echo "$batch" | jq 'length')
             [ "$n" -eq 0 ] && break
             total=$((total + n))
@@ -64,16 +64,16 @@ jobs:
             echo
             echo "=== Diagnostic: all Pages projects in this account and their deployment counts ==="
             PROJ_API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects"
-            names=$(curl -s "${auth[@]}" "$PROJ_API?per_page=100" | jq -r '.result[]?.name')
+            names=$(curl -s "${auth[@]}" "$PROJ_API?per_page=25" | jq -r '.result[]?.name')
             if [ -z "$names" ]; then
               echo "(no Pages projects visible to this token/account)"
               echo "Raw projects response (first 400 chars):"
-              curl -s "${auth[@]}" "$PROJ_API?per_page=100" | head -c 400; echo
+              curl -s "${auth[@]}" "$PROJ_API?per_page=25" | head -c 400; echo
             fi
             for pj in $names; do
               c=0; p=1
               while :; do
-                m=$(curl -s "${auth[@]}" "$PROJ_API/$pj/deployments?per_page=100&page=$p" | jq '.result // [] | length')
+                m=$(curl -s "${auth[@]}" "$PROJ_API/$pj/deployments?per_page=25&page=$p" | jq '.result // [] | length')
                 [ "$m" -eq 0 ] && break
                 c=$((c + m)); p=$((p + 1))
               done
@@ -89,7 +89,7 @@ jobs:
           echo "Deleting $previews preview deployment(s)..."
           deleted=0
           while :; do
-            ids=$(curl -s "${auth[@]}" "$API?per_page=100&page=1" | jq -r '.result[]? | select(.environment=="preview") | .id')
+            ids=$(curl -s "${auth[@]}" "$API?per_page=25&page=1" | jq -r '.result[]? | select(.environment=="preview") | .id')
             [ -z "$ids" ] && break
             progress=0
             for id in $ids; do
