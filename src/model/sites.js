@@ -5,10 +5,14 @@
 // JSON backup bundle so your sites, favourites and custom scopes aren't trapped
 // in one browser.
 //
-// A site: { id, name, lat, lon, elevation_m, horizon: number[36] }.
-// Keys: horizon.sites (array), horizon.activeSite (id). Legacy single-location
-// data (horizon.location + horizon.profile) is migrated once on first read.
+// A site: { id, name, lat, lon, elevation_m, horizon: [[az, alt], …] } — the
+// horizon is serialized v2 pairs (legacy 36-arrays convert on load, so old
+// stores and backups keep working). Keys: horizon.sites (array),
+// horizon.activeSite (id). Legacy single-location data (horizon.location +
+// horizon.profile) is migrated once on first read.
 // =============================================================================
+import { makeHorizon, serializeHorizon } from './horizon.js';
+
 const SITES_KEY = 'horizon.sites';
 const ACTIVE_KEY = 'horizon.activeSite';
 // Keys folded into the backup bundle so a restore carries everything.
@@ -16,10 +20,8 @@ const FAV_KEY = 'horizon.favorites';
 const CUSTOM_INST_KEY = 'horizon.instruments';
 const ACTIVE_INST_KEY = 'horizon.instrument';
 
-const N = 36;
 const clampLat = (x) => Math.max(-90, Math.min(90, Number(x)));
 const wrapLon = (x) => { let v = Number(x); v = ((v + 180) % 360 + 360) % 360 - 180; return v; };
-const clampAlt = (a) => Math.max(0, Math.min(90, Number(a) || 0));
 
 function readJSON(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; }
@@ -31,11 +33,8 @@ function writeJSON(key, value) { try { localStorage.setItem(key, JSON.stringify(
 // runtime, not a resumable workflow script.)
 function sid() { return 'site-' + Math.random().toString(36).slice(2, 8); }
 
-function normalizeHorizon(arr) {
-  const out = new Array(N).fill(0);
-  if (Array.isArray(arr)) for (let i = 0; i < N; i++) out[i] = clampAlt(arr[i]);
-  return out;
-}
+// Any historical horizon shape → canonical serialized pairs.
+function normalizeHorizon(h) { return serializeHorizon(makeHorizon(h)); }
 function normalizeSite(s) {
   return {
     id: s.id || sid(),
@@ -113,9 +112,9 @@ export function updateSite(id, patch) {
   return sites[i];
 }
 
-/** Write just the horizon of a site (from the editor). */
-export function saveSiteHorizon(id, altitudes) {
-  return updateSite(id, { horizon: altitudes });
+/** Write just the horizon of a site (accepts a live profile, pairs, or legacy). */
+export function saveSiteHorizon(id, horizon) {
+  return updateSite(id, { horizon });
 }
 
 /** Remove a site; if it was active, activate another. */
@@ -137,7 +136,7 @@ const BUNDLE_APP = 'horizon-planner';
 export function exportBundle(nowIso) {
   const bundle = {
     app: BUNDLE_APP,
-    version: 1,
+    version: 2, // v2: horizon serialized as [[az, alt], …]; v1 arrays import fine
     exportedAt: nowIso || null,
     sites: loadSites(),
     activeSite: (activeSite() || {}).id || null,

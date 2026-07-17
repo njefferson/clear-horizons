@@ -20,7 +20,7 @@
 // user rotates to match their own reticle.
 // =============================================================================
 import { makeObserver, altAz, starHourAngle } from './astro.js';
-import { sampleAt } from './horizon.js';
+import { makeHorizon, sampleAt } from './horizon.js';
 
 // Pole-star positions (J2000 / EQJ; astro.js precesses to date). RA in hours.
 // Polaris (α UMi) and Sigma Octantis (the faint southern pole star).
@@ -63,8 +63,8 @@ function reticleFromHourAngle(hourAngle, north) {
 /**
  * The full polar-alignment picture for a site at an instant.
  *
- * @param site  { lat, lon, elevation_m?, horizon? } — horizon is the 36-row
- *              measured profile (defaults to a flat 0° horizon if absent).
+ * @param site  { lat, lon, elevation_m?, horizon? } — horizon in any stored
+ *              shape (v2 pairs or legacy array; absent → flat 0°).
  * @param date  Date | ms | AstroTime.
  * @returns {
  *   hemisphere, star, pole: { altitude, azimuth },
@@ -84,7 +84,8 @@ export function polarAlignment(site, date) {
 
   // Horizon-aware pole visibility — the novel part. Sample the measured horizon
   // at the pole's azimuth (due N/S) and compare to the pole's altitude (=|lat|).
-  const profile = { altitudes: normalizeHorizon(site.horizon) };
+  // makeHorizon accepts every stored shape (v2 pairs, legacy arrays, nothing).
+  const profile = makeHorizon(site.horizon);
   const horizonAltitudeAtPole = sampleAt(profile, pole.azimuth);
   const poleClearance = pole.altitude - horizonAltitudeAtPole;
   const poleAboveHorizon = poleClearance > 0;
@@ -115,14 +116,4 @@ export function polarAlignment(site, date) {
     reticle: reticleFromHourAngle(hourAngle, north),
     usable: poleAboveHorizon && pole.altitude > 0,
   };
-}
-
-// Accept a 36-row altitude array (or nothing → flat horizon) for sampleAt().
-function normalizeHorizon(arr) {
-  const out = new Array(36).fill(0);
-  if (Array.isArray(arr)) for (let i = 0; i < 36; i++) {
-    const v = Number(arr[i]);
-    if (Number.isFinite(v)) out[i] = Math.max(0, Math.min(90, v));
-  }
-  return out;
 }

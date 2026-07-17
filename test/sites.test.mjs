@@ -26,24 +26,32 @@ test('first added site becomes active; add/switch works', () => {
   assert.equal(setActiveSite('nope'), false);
 });
 
-test('sites clamp latitude and wrap longitude, default a flat 36-row horizon', () => {
+test('sites clamp latitude and wrap longitude, default a flat horizon', () => {
   localStorage.clear();
   const s = addSite({ name: 'Edge', lat: 120, lon: 400 });
   assert.equal(s.lat, 90);
   assert.equal(s.lon, 40);
-  assert.equal(s.horizon.length, 36);
-  assert.ok(s.horizon.every((a) => a === 0));
+  assert.deepEqual(s.horizon, [[0, 0]], 'flat horizon serializes as a single pair');
 });
 
-test('update + saveSiteHorizon patch a site', () => {
+test('update + saveSiteHorizon patch a site; legacy arrays and dense profiles both store', () => {
   localStorage.clear();
   const s = addSite({ name: 'A', lat: 10, lon: 10 });
   updateSite(s.id, { name: 'Renamed', lat: 11 });
   assert.equal(activeSite().name, 'Renamed');
   assert.equal(activeSite().lat, 11);
+  // A legacy 36-array write normalizes to [az, alt] pairs.
   const alts = Array(36).fill(0); alts[9] = 25;
   saveSiteHorizon(s.id, alts);
-  assert.equal(loadSites()[0].horizon[9], 25);
+  const stored = loadSites()[0].horizon;
+  assert.equal(stored.length, 36);
+  assert.deepEqual(stored.find(([az]) => az === 90), [90, 25]);
+  // A dense captured profile keeps its density (and negative altitudes).
+  const dense = { points: Array.from({ length: 240 }, (_, k) => ({ az: k * 1.5, alt: k % 3 === 0 ? -2 : 12 })) };
+  saveSiteHorizon(s.id, dense);
+  const stored2 = loadSites()[0].horizon;
+  assert.equal(stored2.length, 240, 'no resampling on save');
+  assert.ok(stored2.some(([, alt]) => alt === -2), 'negatives survive storage');
 });
 
 test('removing the active site activates another (or clears)', () => {
@@ -66,8 +74,21 @@ test('migrates a legacy location + profile into one site, once', () => {
   assert.equal(sites.length, 1);
   assert.equal(sites[0].name, 'Old yard');
   assert.equal(sites[0].lat, 34.2);
-  assert.equal(sites[0].horizon[0], 15);
+  assert.deepEqual(sites[0].horizon[0], [0, 15]);
   assert.equal(activeSite().id, sites[0].id);
+});
+
+test('a v1 backup (horizon as a bare 36-array) imports into the v2 shape', () => {
+  localStorage.clear();
+  const alts = Array(36).fill(0); alts[18] = 22; // 180° = 22
+  const v1 = JSON.stringify({
+    app: 'horizon-planner', version: 1, exportedAt: null,
+    sites: [{ id: 'site-x', name: 'Old backup', lat: 40, lon: -75, elevation_m: 0, horizon: alts }],
+    activeSite: 'site-x', favorites: [], instruments: [], activeInstrument: null,
+  });
+  const res = importBundle(v1);
+  assert.equal(res.sites, 1);
+  assert.deepEqual(activeSite().horizon.find(([az]) => az === 180), [180, 22]);
 });
 
 test('backup bundle round-trips sites, favourites and custom scopes', () => {
