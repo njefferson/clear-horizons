@@ -362,6 +362,19 @@ readout — the camera overlay is never the sole channel.
   when no site/horizon exists.
 
 ## Releases
+- **v1.1.1 — 2026-07-17** (SW cache `horizon-v11`). Accessibility round 2, from
+  an independent fresh-eyes audit of v1.1.0 (things axe/contrast structurally
+  can't see). Fixes: focus no longer thrown to the heading on in-view repaints
+  (WCAG 3.2.2 — restore focus to the triggering control); the night-graph scrub
+  is a keyboard slider with an aria-live readout (WCAG 2.1.1); a
+  `@media (forced-colors)` block restores focus rings + selected-state cues
+  (WCAG 2.4.7); emoji-prefixed buttons get clean aria-labels; horizon points are
+  full ARIA sliders (Left/Right/Home/End/PageUp-Dn); the visibility table shows
+  transit time + all up-intervals; chip groups get role=group. Prevention: the
+  axe gate now opens + scans all five dialogs (caught the graph-slider
+  aria-valuenow + About-link contrast, both fixed). Repo: SECURITY.md, issue
+  templates, package.json engines, manifest id. 46 contrast pairs, 0 axe across
+  24 scans, 83 unit, 16 smoke.
 - **v1.1.0 — 2026-07-17** (SW cache `horizon-v10`). Accessibility as a standing
   order + repo presentation, plus the fixes from the first on-device pass.
   **Device-pass bugs:** visibility-window consolidation (jagged real horizons no
