@@ -298,6 +298,20 @@ NEEDS-HIS-HANDS half; the smoke pass drives the whole flow synthetically):**
 - Walk the full first-run journey (no sites yet) before any handoff; honest dead-end
   when no site/horizon exists.
 
+## Releases
+- **v1.0.0 — 2026-07-17** (tag `v1.0.0`, SW cache `horizon-v9`). The first
+  version shipment: the full initial capability set. Offline-first PWA with
+  bundled OpenNGC catalog + per-instrument FOV/mosaic answers (S50 default,
+  S30, custom scopes); multi-site manager with backups; measured horizon —
+  36-handle editor, Stellarium I/O, **and sensor-trace capture with
+  Sun-azimuth compass calibration** (arbitrary-resolution profiles, model v2);
+  night graph cut by the measured horizon with twilight bands + Moon path;
+  visibility table with geometric vs effective windows, zenith dead-zone and
+  Moon-interference flags; horizon-aware Polar Align. Verified: 76 headless
+  unit tests + 13-step Chromium smoke journey. Outstanding at ship time: the
+  on-device sensor pass (compass accuracy/drift, sighting feel) — capture is
+  verified synthetically only.
+
 ## One-time setup (DONE — kept for the record)
 1. Create empty GitHub repo `star-horizon-planner` + a Cloudflare Pages project of
    the same name.
