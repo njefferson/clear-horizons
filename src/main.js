@@ -13,6 +13,7 @@ import { renderTonight } from './ui/nightgraph.js';
 import { renderSites } from './ui/sites.js';
 import { renderPolar } from './ui/polar.js';
 import { renderCapture } from './ui/capture.js';
+import { renderLiveCapture } from './ui/livecapture.js';
 import { loadSites, requestPersistence } from './model/sites.js';
 
 const state = {
@@ -104,6 +105,7 @@ function render(navigated = true, key = null) {
   // settle their focus once the first paint lands.
   const done = (p) => { (p && typeof p.then === 'function') ? p.then(after) : after(); };
   if (h.startsWith('#/targets')) return done(renderTargets(app, state, nav));
+  if (h.startsWith('#/capture/live')) return done(renderLiveCapture(app, state, nav)); // live-camera AR capture
   if (h.startsWith('#/capture')) return done(renderCapture(app, state, nav)); // sub-view of Horizon, no tab
   if (h.startsWith('#/horizon')) return done(renderHorizonEditor(app, state, nav));
   if (h.startsWith('#/polar')) return done(renderPolar(app, state, nav));

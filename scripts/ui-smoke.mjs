@@ -171,6 +171,52 @@ await step('capture: synthetic sensor sweep bins, covers the circle, saves', asy
   ok(/tallest 18°/.test(max), `captured treeline applied: ${max}`);
 });
 
+await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep saves', async () => {
+  // No real camera in headless — hand getUserMedia a canvas stream so the
+  // viewfinder path (video + overlay canvas + draw loop) runs end to end.
+  await page.evaluate(() => {
+    if (!navigator.mediaDevices) Object.defineProperty(navigator, 'mediaDevices', { value: {}, configurable: true });
+    navigator.mediaDevices.getUserMedia = async () => {
+      const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+      return c.captureStream(1);
+    };
+    location.hash = '#/capture/live';
+  });
+  await page.waitForSelector('.lc-stage');
+  await page.waitForSelector('.lc-canvas');
+  ok(!(await page.$('.lc-stage.lc-nocam')), 'camera path taken (not the no-camera fallback)');
+
+  // The reticle is keyboard-operable: focus it, nudge up, confirm the ARIA
+  // value moved — the pointer-free path to aim above eye level.
+  await page.focus('.lc-reticle-focus');
+  const before = await page.$eval('.lc-reticle-focus', (e) => e.getAttribute('aria-valuenow'));
+  await page.keyboard.press('ArrowUp');
+  const after = await page.$eval('.lc-reticle-focus', (e) => e.getAttribute('aria-valuenow'));
+  ok(Number(after) > Number(before), `reticle altitude nudged up by keyboard: ${before}→${after}`);
+  await page.keyboard.press('Home'); // back to centre so the sweep records the axis
+
+  // Same synthetic Android sweep as the sensor path: an 18° south wall.
+  await page.click('#lc-rec');
+  await page.evaluate(() => {
+    for (let heading = 0; heading < 360; heading++) {
+      const beta = 90 + (heading >= 170 && heading <= 190 ? 18 : 4);
+      window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', {
+        alpha: (360 - heading) % 360, beta, gamma: 0, absolute: true,
+      }));
+    }
+  });
+  await page.click('#lc-rec'); // Stop
+  const cov = await page.$eval('#lc-cov', (e) => e.textContent);
+  ok(/ 100% /.test(cov), `full-circle coverage over the camera path: ${cov}`);
+  const readout = await page.$eval('#lc-readout', (e) => e.textContent);
+  ok(/az \d+° · reticle -?\d+° alt/.test(readout), `live numeric readout present: ${readout}`);
+  await shot('livecapture.png');
+  await page.click('.lc-controls .btn.primary:has-text("Save")');
+  await page.waitForSelector('.hz-svg'); // lands back on the editor
+  const max = await page.$eval('.hz-max', (e) => e.textContent);
+  ok(/tallest 18°/.test(max), `live-captured treeline applied: ${max}`);
+});
+
 await step('targets: "Up tonight" narrows to the observable sky, then filters', async () => {
   await tab('Targets');
   await page.waitForSelector('.target-row');

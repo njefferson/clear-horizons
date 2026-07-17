@@ -270,6 +270,33 @@ NEEDS-HIS-HANDS. Accessibility note (standing order): the reticle needs a
 keyboard/manual-entry equivalent, and the AR bar-graph carries a text/numeric
 readout — the camera overlay is never the sole channel.
 
+**Build order — STARTED (first increment built, awaiting the on-device pass):**
+- **L1** `model/arproject.js` (100% headless): the world↔image-plane projection
+  under the overlay. Linear (equirectangular) map — accurate enough for a
+  skyline guide over a phone's modest FOV and, unlike gnomonic, trivially
+  invertible (the reticle needs the inverse). `projectPoint`, the
+  `azimuthAtScreenX`/`altitudeAtScreenY` inverses, `horizonPolyline`. FOV is a
+  per-device calibration knob (`DEFAULT_FOV`), never baked into a recorded
+  number — the samples still come straight from the sensors, so a wrong FOV
+  only skews the GUIDE. Tests: centre identity, sign conventions, exact
+  round-trip inversion, frame culling, polyline trace. **BUILT.**
+- **L2** `ui/livecapture.js` — `#/capture/live`, entered from a 📷 chip on the
+  sensor Measure view. `getUserMedia({facingMode:'environment'})` fills a
+  viewfinder; a canvas overlay draws the stored horizon (thin) + the live sweep
+  (bold, accent) + a centre reticle every frame, projected via L1 off the same
+  orientation pipeline as `ui/capture.js` (identical Sun-calibration + median-
+  binned session). Record a continuous sweep OR nudge the reticle up to a
+  treetop and **Mark** a point (the keyboard path: ↑/↓ aim, Enter mark). Every
+  camera failure (denied / absent / insecure origin) degrades to a clear
+  message + links to no-camera mode and the editor. The 60 Hz az/alt readout is
+  text (silent by design); discrete actions announce via role=status. SW v12.
+  Smoke drives it with a mocked canvas stream + synthetic orientation; axe scans
+  the fallback state (8th view). **BUILT.**
+- **Still ahead:** drag-the-reticle-by-touch along the skyline (today: centre +
+  vertical nudge/Mark); real per-device FOV calibration; auto-trace (sky
+  segmentation) and the panorama export (both still stretch). The camera framing,
+  FOV accuracy and spin-and-trace feel are the NEEDS-HIS-HANDS half.
+
 ## Roadmap (deferred — post-v1, rough order)
 - **"Visible from this site tonight" filter** (Targets) — SHIPPED v1.1.0 as a
   first-class filter: the catalog first narrows to what actually clears the
