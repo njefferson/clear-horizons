@@ -6,5 +6,8 @@ node_modules/
 .env
 *.local
 
+# Deploy bundle (assembled by scripts/stage-dist.mjs at deploy time)
+dist/
+
 # OS / editor cruft
 .DS_Store

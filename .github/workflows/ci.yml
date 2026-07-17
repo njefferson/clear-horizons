@@ -25,3 +25,5 @@ jobs:
         run: node scripts/build-catalog.mjs validate
       - name: Contrast gate (WCAG AA, both themes)
         run: node scripts/check-contrast.mjs
+      - name: Deploy bundle parity (dist/ complete, no leaks)
+        run: node scripts/stage-dist.mjs && node scripts/check-dist.mjs

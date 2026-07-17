@@ -1,0 +1,10 @@
+# Cloudflare Pages response headers. Security headers + a conservative CSP.
+# The app is fully self-hosted except Google Fonts (IBM Plex); astronomy-engine
+# is vendored, so no other origins are needed. (When the roadmap weather/
+# thumbnail sources land, add their hosts to connect-src / img-src here.)
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(self), geolocation=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self), interest-cohort=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'

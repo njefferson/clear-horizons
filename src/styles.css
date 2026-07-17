@@ -63,6 +63,10 @@ body { padding-bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); 
   padding: calc(12px + env(safe-area-inset-top)) 12px 24px; }
 
 h1 { font-size: 22px; margin: 0; font-family: var(--serif); font-weight: 600; }
+/* The view heading gets tabindex=-1 so navigation can move focus into the
+   content for screen readers — but it's a landing target, not an interactive
+   control, so it must not show a focus ring. */
+[tabindex="-1"]:focus { outline: none; }
 h2 { font-size: 16px; margin: 0 0 6px; }
 h3 { font-size: 14px; margin: 14px 0 4px; }
 a { color: var(--accent); }

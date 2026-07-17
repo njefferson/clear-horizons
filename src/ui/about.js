@@ -32,6 +32,12 @@ const ABOUT_HTML = `
   mosaic panels / framing overlay" answer reads the <em>active</em> instrument —
   never a hardcoded constant.</p>
 
+  <h3>Built to be usable by everyone</h3>
+  <p>Accessibility is a first-class goal: nothing is conveyed by colour alone
+  (the graph uses marker shapes and labels, on a colour-blind-safe palette),
+  contrast is held to WCAG&nbsp;AA and checked automatically, and every control
+  has a keyboard path. Light and dark are both first-class.</p>
+
   <h3>Data &amp; credits</h3>
   <p class="about-credits">Deep-sky catalog derived from
   <a href="https://github.com/mattiaverga/OpenNGC" target="_blank" rel="noopener">OpenNGC</a>

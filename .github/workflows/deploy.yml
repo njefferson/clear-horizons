@@ -40,11 +40,19 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages project create star-horizon-planner --production-branch=main
 
-      # The app is served from the repo root (no build step — no-build vanilla
-      # ES modules). branch=main is production; any other branch is a preview.
+      # Assemble the publishable site into dist/ (allow-list, no build step —
+      # no-build vanilla ES modules) so repo internals (NOTES.md, review docs,
+      # test/, scripts/, package.json) never reach production, then verify the
+      # bundle before publishing.
+      - name: Stage dist/
+        run: node scripts/stage-dist.mjs
+      - name: Verify dist/ (precache parity + no leaks)
+        run: node scripts/check-dist.mjs
+
+      # branch=main is production; any other branch is a preview.
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy . --project-name=star-horizon-planner --branch=${{ github.ref_name }} --commit-dirty=true
+          command: pages deploy dist --project-name=star-horizon-planner --branch=${{ github.ref_name }} --commit-dirty=true

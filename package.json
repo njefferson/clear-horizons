@@ -1,9 +1,30 @@
 {
   "name": "star-horizon-planner",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Offline-first astronomy planner built around a custom, per-site measured horizon.",
+  "description": "Offline-first astronomy planner built around a custom, per-site, physically-measured horizon.",
+  "keywords": [
+    "astronomy",
+    "astrophotography",
+    "seestar",
+    "smart-telescope",
+    "stargazing",
+    "pwa",
+    "offline-first",
+    "horizon",
+    "polar-alignment"
+  ],
+  "homepage": "https://star-horizon-planner.pages.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/njefferson/star-horizon-planner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/njefferson/star-horizon-planner/issues"
+  },
+  "author": "Noah Jefferson",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "test": "node --test",
     "test:contrast": "node scripts/check-contrast.mjs",

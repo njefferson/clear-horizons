@@ -355,6 +355,23 @@ readout — the camera overlay is never the sole channel.
   when no site/horizon exists.
 
 ## Releases
+- **v1.1.0 — 2026-07-17** (SW cache `horizon-v10`). Accessibility as a standing
+  order + repo presentation, plus the fixes from the first on-device pass.
+  **Device-pass bugs:** visibility-window consolidation (jagged real horizons no
+  longer spray 2–6 min "windows"); status-bar safe-area padding; horizontal-
+  overflow fix; capture aiming corrected to the **camera-pointing** model
+  (point the back camera at the treeline; up for tall obstructions); short
+  display names. **New:** Targets **"Up tonight"** filter (what clears your
+  horizon during dark hours, then filter down). **Accessibility:** night-graph
+  palette replaced with a CVD-validated set + per-series **marker shapes** and
+  peak labels (identity never colour-alone); `scripts/check-contrast.mjs`
+  (WCAG AA, in CI) and `scripts/a11y-scan.mjs` (axe, 7 views × 2 themes, zero
+  violations); ARIA state/roles/live-regions, focus management, reduced-motion.
+  **Repo:** README, LICENSE (PolyForm-NC-1.0.0), package.json metadata, OG/
+  Twitter cards + `og-image.png`, manifest 192/512 maskable icons + screenshots,
+  and a deploy allow-list (`dist/`) so internals stop reaching production.
+  *Cache-name note:* app version and SW cache diverged early (v9 was labelled
+  "v1.2"); from here the Releases entry maps the two — app 1.1.0 = cache v10.
 - **v1.0.0 — 2026-07-17** (tag `v1.0.0`, SW cache `horizon-v9`). The first
   version shipment: the full initial capability set. Offline-first PWA with
   bundled OpenNGC catalog + per-instrument FOV/mosaic answers (S50 default,
