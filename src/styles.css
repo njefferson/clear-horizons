@@ -6,7 +6,7 @@
   --bg: #ebe1cf; --bg2: #f2ead9; --card: #faf4e8; --card2: #f2ead9;
   --ink: #2c2318; --dim: #6b5d47; --line: #e2d6bf; --track: #e6dcc7;
   --accent: #b07bd6; --accent-ink: #5a3580; --accent-wash: #efe4f6; --accent2: #7b57c4;
-  --slate: #3f77a4; --slate-wash: #dbe7f0; --warn: #8a6212; --live: #c0563a;
+  --slate: #2f6188; --slate-wash: #dbe7f0; --warn: #7a5710; --live: #c0563a;
   --danger: #9c3320; --danger-dim: #7a2e2e;
   --park: #2b7449;  /* "fits" tier + clear-flag green — contrast-safe text (was an undefined var) */
   /* Tab dock — its own neutral surface with light glyphs, so it can't be

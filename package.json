@@ -6,6 +6,8 @@
   "description": "Offline-first astronomy planner built around a custom, per-site measured horizon.",
   "scripts": {
     "test": "node --test",
-    "test:ui": "node scripts/ui-smoke.mjs"
+    "test:contrast": "node scripts/check-contrast.mjs",
+    "test:ui": "node scripts/ui-smoke.mjs",
+    "test:a11y": "node scripts/a11y-scan.mjs"
   }
 }

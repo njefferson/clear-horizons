@@ -70,8 +70,11 @@ function pairs(t, mode) {
     ['primary button ink on accent', '#12131c', t('accent'), AA],
     ['tab label on dock', t('tab-ink'), t('dock'), AA],
     ['active tab on dock', t('tab-ink-active'), t('dock'), AA],
-    ['warn pill text on card', t('warn'), t('card'), AA],
     ['danger text on card', t('danger'), t('card'), AA],
+    // Tinted status pills: the text sits on a wash of ITS OWN hue, darker than
+    // plain card — these are what axe flags if the token is too light.
+    ['warn pill text on warn tint', t('warn'), mix(t('warn'), t('card'), 0.14), AA],
+    ['polar "clear" title on slate-wash', t('slate'), t('slate-wash'), AA],
     // "fits" tier badge: --park text on a 16%-green tinted card.
     ['fits-tier text on green tint', t('park'), mix('#5fae79', t('card'), 0.16), AA],
     // Graph (fixed palette, both themes) — lines/axis are non-text UI (3:1).
