@@ -9,16 +9,42 @@ import {
   isFavorite, toggleFavorite,
 } from '../model/catalog.js';
 import { activeInstrument, fovOf } from '../model/instruments.js';
+import { activeSite } from '../model/sites.js';
+import { makeObserver } from '../model/astro.js';
+import { makeHorizon } from '../model/horizon.js';
+import { darkWindow } from '../model/night.js';
+import { visibleTonight } from '../model/visibility.js';
 
 // Per-session filter state, hung off the app state so it survives re-renders.
 function filters(state) {
   if (!state.targets) {
     state.targets = {
       query: '', categories: new Set(), magMax: 12,
-      sizeBand: 'any', fit: 'any', favoritesOnly: false, sort: 'messier',
+      sizeBand: 'any', fit: 'any', favoritesOnly: false, visibleOnly: false, sort: 'messier',
     };
   }
   return state.targets;
+}
+
+// "Up tonight" is expensive (a sky sweep over the whole catalog), but the
+// answer is fixed until the site, night, or instrument changes — so cache it.
+let _visCache = null; // { key, ids: Set }
+function visKey(state) {
+  const s = activeSite(); if (!s) return null;
+  return `${s.id}:${state.night.toDateString()}:${activeInstrument().id}`;
+}
+function cachedVisible(state) {
+  const key = visKey(state);
+  return key && _visCache && _visCache.key === key ? _visCache.ids : null;
+}
+function computeVisible(objects, state) {
+  const key = visKey(state); if (!key) return null;
+  const s = activeSite();
+  const observer = makeObserver(s.lat, s.lon, s.elevation_m || 0);
+  const window = darkWindow(observer, state.night);
+  const ids = visibleTonight(objects, observer, makeHorizon(s.horizon), { window, instrument: activeInstrument() });
+  _visCache = { key, ids };
+  return ids;
 }
 
 const SIZE_BANDS = {
@@ -44,19 +70,39 @@ export async function renderTargets(app, state, nav) {
   const list = el('div.target-list');
   const count = el('p.count');
 
+  // "Up tonight" needs the active site's sky swept — cheap once cached, a
+  // ~half-second sweep on a cache miss. Grab the cache now; if it's a miss and
+  // the filter is on, compute AFTER first paint (deferred below) so the tab
+  // never freezes on the toggle.
+  let visSet = cachedVisible(state);
+  const hasSite = !!activeSite();
+  const needCompute = f.visibleOnly && hasSite && !visSet;
+
   // Repaint just the list + count from current filters — used by the search box
   // so typing never rebuilds (and unfocuses) the input.
   function paint() {
     const [minSizeArcmin, maxSizeArcmin] = SIZE_BANDS[f.sizeBand];
-    const rows = filterCatalog(objects, {
+    let rows = filterCatalog(objects, {
       query: f.query, categories: f.categories, magMax: f.magMax,
       minSizeArcmin, maxSizeArcmin, fit: f.fit,
       favoritesOnly: f.favoritesOnly, sort: f.sort,
     }, inst);
-    count.textContent = `${rows.length} of ${objects.length} objects`;
+    if (f.visibleOnly && visSet) rows = rows.filter((o) => visSet.has(o.id));
+
+    if (f.visibleOnly && needCompute && !visSet) {
+      count.textContent = 'Checking what’s up tonight…';
+    } else if (f.visibleOnly) {
+      count.textContent = `${rows.length} up tonight · ${objects.length} in the catalog`;
+    } else {
+      count.textContent = `${rows.length} of ${objects.length} objects`;
+    }
     clear(list);
+    if (f.visibleOnly && needCompute && !visSet) return; // list fills after compute
     if (!rows.length) {
-      list.append(deadEnd('No matches', 'Loosen a filter — lower the magnitude limit, clear the category, or turn off favourites-only.'));
+      const why = f.visibleOnly
+        ? 'Nothing clears your horizon during dark hours tonight at this site — try another night, or check your horizon profile.'
+        : 'Loosen a filter — lower the magnitude limit, clear the category, or turn off favourites-only.';
+      list.append(deadEnd('No matches', why));
       return;
     }
     for (const o of rows) list.append(row(o));
@@ -65,6 +111,15 @@ export async function renderTargets(app, state, nav) {
   clear(app);
   app.append(controls(f, inst, nav, paint), count, list);
   paint();
+
+  // Deferred first compute: yields a frame so "Checking…" paints, then the
+  // sweep runs and the list fills. Guarded against the user tabbing away.
+  if (needCompute) {
+    setTimeout(() => {
+      visSet = computeVisible(objects, state);
+      if (isTargetsRoute()) paint();
+    }, 0);
+  }
 }
 
 function isTargetsRoute() {
@@ -100,6 +155,14 @@ function controls(f, inst, nav, paint) {
     f.sort, (v) => { f.sort = v; nav.rerender(); }));
   const favBtn = chip('★ Favourites', f.favoritesOnly, () => { f.favoritesOnly = !f.favoritesOnly; nav.rerender(); });
 
+  // "Up tonight" narrows to what actually clears the active site's measured
+  // horizon during dark hours — the app's thesis applied to discovery. Needs a
+  // site; disabled (with a hint) until one exists.
+  const site = activeSite();
+  const visBtn = site
+    ? chip('🌙 Up tonight', f.visibleOnly, () => { f.visibleOnly = !f.visibleOnly; nav.rerender(); })
+    : el('button.chip', { disabled: '', title: 'Add an observing site first (Sites tab)', 'aria-disabled': 'true' }, '🌙 Up tonight');
+
   return el('div.filters', {}, [
     el('div.filters-head', {}, [
       el('h1', {}, 'Targets'),
@@ -108,7 +171,7 @@ function controls(f, inst, nav, paint) {
     ]),
     search,
     catRow,
-    el('div.filters-row', {}, [magSel, sortSel, favBtn]),
+    el('div.filters-row', {}, [magSel, sortSel, visBtn, favBtn]),
     el('div.filters-labelrow', {}, [el('span.fl', {}, 'Framing'), fitRow]),
     el('div.filters-labelrow', {}, [el('span.fl', {}, 'Size'), sizeRow]),
   ]);

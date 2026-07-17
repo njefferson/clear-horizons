@@ -167,9 +167,23 @@ await step('capture: synthetic sensor sweep bins, covers the circle, saves', asy
   ok(/tallest 18°/.test(max), `captured treeline applied: ${max}`);
 });
 
-await step('targets: search the catalog and favourite M42', async () => {
+await step('targets: "Up tonight" narrows to the observable sky, then filters', async () => {
   await tab('Targets');
   await page.waitForSelector('.target-row');
+  const all = await page.$$eval('.target-row', (e) => e.length);
+  // The site (Smoke Yard, with the captured 18° south wall) is set → chip enabled.
+  await page.click('.chip:has-text("Up tonight")');
+  // Deferred compute paints "Checking…" then the result; wait for the count to settle.
+  await page.waitForFunction(() => /up tonight|No matches/.test(document.querySelector('.count,.dead-end h2')?.textContent || ''), null, { timeout: 8000 });
+  const cnt = await page.$eval('.count', (e) => e.textContent);
+  ok(/up tonight/.test(cnt), `count reflects the filter: ${cnt}`);
+  const upTonight = await page.$$eval('.target-row', (e) => e.length);
+  ok(upTonight <= all, `up-tonight subset (${upTonight}) ≤ full (${all})`);
+  await page.click('.chip:has-text("Up tonight")'); // toggle back off
+  await page.waitForSelector('.target-row');
+});
+
+await step('targets: search the catalog and favourite M42', async () => {
   await page.fill('.search', 'orion nebula');
   await page.waitForSelector('.target-row'); // list repaints in place
   await page.click('.target-row .fav');

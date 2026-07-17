@@ -112,3 +112,38 @@ const midpoint = (a, b) => Math.round((a + b) / 2);
 export function totalMinutes(list) {
   return Math.round(list.reduce((m, iv) => m + (iv.end - iv.start), 0) / 60000);
 }
+
+/**
+ * Which of `objects` actually clear the site's measured horizon (and stay
+ * below the mount's zenith dead-zone) at SOME point during the given dark
+ * window — the app's thesis applied to discovery: narrow the catalog to what's
+ * genuinely observable tonight before any other filter runs.
+ *
+ * Sampled coarsely with an early exit (most visible objects pass within a few
+ * samples); only never-visible ones walk the whole window. Callers should
+ * cache the result per site+night+instrument — it's the same answer until one
+ * of those changes.
+ *
+ * @param objects   catalog rows [{ id, ra, dec }, …]
+ * @param window    { start, end } — a dark span (see night.darkWindow)
+ * @returns Set<id>
+ */
+export function visibleTonight(objects, observer, horizon, { window, instrument = null, eqMode = false, stepMinutes = 12 } = {}) {
+  const deadZone = eqMode || !instrument ? 0 : zenithDeadZone(instrument);
+  const step = stepMinutes * 60000;
+  const times = [];
+  for (let ms = window.start.getTime(); ms <= window.end.getTime(); ms += step) times.push(new Date(ms));
+  if (!times.length) times.push(window.start);
+  const ids = new Set();
+  for (const o of objects) {
+    const target = { ra: o.ra, dec: o.dec };
+    for (const d of times) {
+      const { altitude, azimuth } = altAz(target, observer, d);
+      if (altitude <= 0) continue;
+      const aboveTrees = horizon ? isAbove(horizon, azimuth, altitude) : true;
+      const belowZenith = deadZone > 0 ? altitude < deadZone : true;
+      if (aboveTrees && belowZenith) { ids.add(o.id); break; } // early-exit: one pass is enough
+    }
+  }
+  return ids;
+}

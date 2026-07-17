@@ -8,7 +8,7 @@ globalThis.localStorage = (() => {
 })();
 
 const { makeObserver } = await import('../src/model/astro.js');
-const { nightWindow, sampleTwilight, darkestAltitude } = await import('../src/model/night.js');
+const { nightWindow, sampleTwilight, darkestAltitude, darkWindow } = await import('../src/model/night.js');
 
 const obs = makeObserver(37.5, -122.0, 0);
 const DATE = new Date('2026-03-20T12:00:00Z');
@@ -45,6 +45,23 @@ test('nightWindow falls back to a fixed polar-day window', () => {
   assert.equal(w.polar, true);
   assert.equal(w.sunset, null);
   assert.ok(w.start.getTime() < w.end.getTime());
+});
+
+test('darkWindow returns an astronomically-dark span inside the night window', () => {
+  const w = nightWindow(obs, DATE);
+  const d = darkWindow(obs, DATE);
+  assert.equal(d.dark, true);
+  assert.ok(d.start.getTime() >= w.start.getTime() && d.end.getTime() <= w.end.getTime(), 'inside the plot window');
+  assert.ok(d.start.getTime() < d.end.getTime(), 'ordered');
+  // The dark span is strictly shorter than dusk→dawn (twilight trimmed off).
+  assert.ok((d.end - d.start) < (w.end - w.start));
+});
+
+test('darkWindow falls back (dark:false) under the polar-day sun', () => {
+  const arctic = makeObserver(78, 15, 0);
+  const d = darkWindow(arctic, new Date('2026-06-21T12:00:00Z'));
+  assert.equal(d.dark, false, 'never reaches nautical darkness');
+  assert.ok(d.start.getTime() < d.end.getTime());
 });
 
 // (The legacy single-location store was absorbed by sites.js in v1.1; its

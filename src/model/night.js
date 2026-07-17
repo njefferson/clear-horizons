@@ -54,3 +54,21 @@ export function sampleTwilight(observer, start, end, stepMinutes = 5) {
 export function darkestAltitude(samples) {
   return samples.reduce((m, s) => Math.min(m, s.alt), Infinity);
 }
+
+/**
+ * The astronomically-dark sub-span of tonight — from the Sun crossing −18° at
+ * dusk to −18° at dawn. Falls back to nautical (−12°) when it never gets fully
+ * dark, and to the whole nightWindow if even that fails (bright northern
+ * summer). Used by the "visible tonight" target filter to judge visibility
+ * only while the sky is actually usable.
+ * @returns { start, end, dark: bool }
+ */
+export function darkWindow(observer, date) {
+  const win = nightWindow(observer, date);
+  const samples = sampleTwilight(observer, win.start, win.end, 10);
+  for (const limit of [-18, -12]) {
+    const dark = samples.filter((s) => s.alt < limit);
+    if (dark.length) return { start: dark[0].t, end: dark[dark.length - 1].t, dark: true };
+  }
+  return { start: win.start, end: win.end, dark: false };
+}

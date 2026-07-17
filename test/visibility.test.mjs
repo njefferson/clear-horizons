@@ -10,7 +10,7 @@ globalThis.localStorage = (() => {
 const { makeObserver } = await import('../src/model/astro.js');
 const { makeHorizon } = await import('../src/model/horizon.js');
 const { instrumentById } = await import('../src/model/instruments.js');
-const { visibility, totalMinutes, consolidateIntervals } = await import('../src/model/visibility.js');
+const { visibility, totalMinutes, consolidateIntervals, visibleTonight } = await import('../src/model/visibility.js');
 
 const iv = (a, b) => ({ start: new Date(a), end: new Date(b) }); // minutes → interval
 const M = (m) => m * 60000;
@@ -90,6 +90,23 @@ test('EQ mode relaxes the dead-zone (no split)', () => {
   assert.equal(v.deadZone, 0);
   assert.equal(v.clipsDeadZone, false);
   assert.equal(v.effective.length, 1, 'continuous once the dead-zone is relaxed');
+});
+
+test('visibleTonight keeps what clears the horizon, drops the never-up', () => {
+  const dark = { start: new Date('2026-09-22T21:00:00Z'), end: new Date('2026-09-23T03:00:00Z') };
+  const objs = [
+    { id: 'circumpolar', ra: 0, dec: 88 }, // from lat 40: always up, transit ~42°
+    { id: 'deep-south', ra: 0, dec: -80 }, // from lat 40: never rises
+    { id: 'mid', ra: 0, dec: 10 },
+  ];
+  const flat = visibleTonight(objs, obs, null, { window: dark });
+  assert.ok(flat.has('circumpolar'), 'up all night clears a flat horizon');
+  assert.ok(!flat.has('deep-south'), 'never above the horizon → excluded');
+
+  // A 45° wall everywhere blocks the circumpolar object (max alt ~42° < 45°).
+  const wall = makeHorizon(Array(36).fill(45));
+  const walled = visibleTonight(objs, obs, wall, { window: dark });
+  assert.ok(!walled.has('circumpolar'), 'a 45° treeline blocks the 42°-max object');
 });
 
 test('interval edges stay within the requested window', () => {
