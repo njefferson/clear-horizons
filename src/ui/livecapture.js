@@ -30,8 +30,15 @@ import { makeObserver } from '../model/astro.js';
 import { makeHorizon, maxAltitude, sampleAt } from '../model/horizon.js';
 import {
   headingFromAlpha, applyOffset, sunCalibration,
-  makeSession, addSample, sampleCount, coverage, profileFromSession,
+  makeSession, addSample, sampleCount, coverage, largestGap, profileFromSession,
 } from '../model/capture.js';
+
+// A hand-sweep never touches every 1° bin; the profile interpolates across
+// small gaps, so "all the way around" means the widest gap is small — not that
+// every degree was individually hit. This is that threshold.
+const COMPLETE_GAP_DEG = 6;
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const compass = (az) => COMPASS[Math.round((((az % 360) + 360) % 360) / 45) % 8];
 import {
   DEFAULT_FOV, projectPoint, altitudeAtScreenY, horizonPolyline,
 } from '../model/arproject.js';
@@ -107,7 +114,7 @@ export function renderLiveCapture(app, state, nav) {
       el('button.btn', { onclick: () => { stopLive(); nav.go('#/capture'); }, 'aria-label': 'Switch to no-camera sensor capture' }, 'No camera'),
     ]),
     el('p.small.mono', { id: 'lc-cov' }, covText()),
-    el('p.dim.small', {}, 'Point the back camera at the treeline and spin slowly; the horizon draws on the sky. Nudge the reticle up to a treetop above you, then Mark — or Record and sweep continuously. Camera off? Use no-camera mode or the Horizon editor.'),
+    el('p.dim.small', {}, 'Keep the centre crosshair on the treetops and pan slowly all the way around — the purple trace fills in behind you (about 1° detail). Pan slowly where the outline is busy; go once around and it stops itself. Small gaps fill in automatically; for a tricky spot, nudge the reticle onto it and Mark. Camera off? Use no-camera mode or the Horizon editor.'),
   ]);
 
   // Reticle keyboard path lives on a focusable region over the video.
@@ -273,14 +280,19 @@ function toggleRecording() {
   say(lc.recording ? 'Recording — sweep the treeline; it stops itself at a full circle.' : `Stopped. ${covText()}`);
 }
 
-// One full loop is enough. Auto-stop at complete coverage so you can edit or
-// save instead of manually stopping — and so a second lap can't pile on.
+// The whole circle is traced once the widest UNSWEPT gap is small enough to
+// interpolate — not when every 1° bin is individually hit (a hand-sweep never
+// does that). Auto-stop there so you can edit/save and a second lap can't pile on.
+function isComplete() {
+  const c = coverage(lc.session);
+  return c.binsWithData > 30 && c.maxGapDeg <= COMPLETE_GAP_DEG;
+}
 function maybeAutoStop() {
   if (!lc || !lc.recording) return;
-  if (coverage(lc.session).pct >= 100) {
+  if (isComplete()) {
     lc.recording = false;
     paintRecBtn();
-    say('Full circle captured — nudge the reticle and Mark to fix any spot, or Save. (Reset to redo.)');
+    say('Full circle traced ✓ — small gaps fill in automatically. Mark to fix a spot, or Save. (Reset to redo.)');
   }
 }
 
@@ -379,9 +391,31 @@ function draw(canvas) {
   }
   if (lc.session.bins.size) {
     const captured = profileFromSession(lc.session);
+    const px = horizonPolyline(captured, sampleAt, lc.cam, lc.fov, 2).map(toPx);
+    // Filled silhouette so the traced horizon reads as a solid mask forming as
+    // you pan — strong feedback that it's actually tracking the treeline.
+    if (px.length) {
+      ctx.save();
+      ctx.globalAlpha = 0.22; ctx.fillStyle = accent;
+      ctx.beginPath();
+      px.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.lineTo(px[px.length - 1][0], H); ctx.lineTo(px[0][0], H); ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
     ctx.strokeStyle = accent;
     ctx.lineWidth = Math.max(2, W / 180);
-    strokePoly(ctx, horizonPolyline(captured, sampleAt, lc.cam, lc.fov, 2).map(toPx));
+    strokePoly(ctx, px);
+    // Dots at the ACTUAL recorded points in view — makes the ~1° granularity
+    // (and any thin spots) visible, so tracing a busy outline is legible.
+    ctx.fillStyle = accent;
+    const r = Math.max(1.5, W / 320);
+    for (const p of captured.points) {
+      const q = projectPoint({ az: p.az, alt: p.alt }, lc.cam, lc.fov);
+      if (!q.onScreen) continue;
+      const x = (0.5 + q.x) * W, y = (0.5 + q.y) * H;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
   }
 }
 
@@ -395,7 +429,11 @@ function strokePoly(ctx, pts) {
 // --- helpers -----------------------------------------------------------------
 function covText() {
   const c = coverage(lc.session);
-  return `${sampleCount(lc.session)} samples · ${c.pct}% of the circle · widest gap ${c.maxGapDeg}°`;
+  const n = sampleCount(lc.session);
+  if (!c.binsWithData) return 'No points yet · pan slowly along the treetops';
+  if (isComplete()) return `Full circle traced ✓ · ${c.binsWithData}° covered, small gaps fill in`;
+  const g = largestGap(lc.session);
+  return `Tracing… ${c.binsWithData}° of 360° · biggest gap ${c.maxGapDeg}° to the ${compass(g.centerAz)}`;
 }
 function updateCoverage() {
   const n = root && root.querySelector('#lc-cov');

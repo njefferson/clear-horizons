@@ -123,6 +123,29 @@ export function coverage(session) {
   };
 }
 
+/**
+ * The widest unswept gap AND where it is — so the UI can say "keep panning; the
+ * biggest hole is to the SW" instead of a bare percentage. A full hand-sweep
+ * never touches every 1° bin, but the profile interpolates across small gaps, so
+ * "done" means the widest gap is small, not that every bin is filled.
+ * @returns { gapDeg, centerAz } — centerAz is the azimuth of the gap's middle.
+ */
+export function largestGap(session) {
+  const total = Math.round(360 / session.binDeg);
+  const filled = [...session.bins.keys()].sort((a, b) => a - b);
+  if (!filled.length) return { gapDeg: 360, centerAz: 0 };
+  let best = { len: -1, startBin: 0 };
+  for (let k = 0; k < filled.length; k++) {
+    const cur = filled[k];
+    const next = k + 1 < filled.length ? filled[k + 1] : filled[0] + total;
+    const len = next - cur - 1; // empty bins between this filled one and the next
+    if (len > best.len) best = { len, startBin: cur + 1 };
+  }
+  const centerBin = best.startBin + (best.len - 1) / 2;
+  const centerAz = ((centerBin * session.binDeg) % 360 + 360) % 360;
+  return { gapDeg: best.len * session.binDeg, centerAz };
+}
+
 const median = (xs) => {
   const s = [...xs].sort((a, b) => a - b);
   const m = s.length >> 1;

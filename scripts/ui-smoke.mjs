@@ -205,6 +205,9 @@ await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep save
   await page.waitForSelector('.lc-stage');
   await page.waitForSelector('.lc-canvas');
   ok(!(await page.$('.lc-stage.lc-nocam')), 'camera path taken (not the no-camera fallback)');
+  // Where motion isn't permission-gated (Android/desktop/headless), compass
+  // auto-attaches and the Enable-compass button stays hidden.
+  ok(await page.$eval('#lc-motion', (e) => e.hidden || getComputedStyle(e).display === 'none'), 'Enable-compass button hidden on the auto-attach path');
 
   // The reticle is keyboard-operable: focus it, nudge up, confirm the ARIA
   // value moved — the pointer-free path to aim above eye level.
@@ -229,7 +232,7 @@ await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep save
   // lap. Wait for the button to fall back to "Record".
   await page.waitForFunction(() => /Record/.test(document.querySelector('#lc-rec')?.textContent || ''));
   const cov = await page.$eval('#lc-cov', (e) => e.textContent);
-  ok(/ 100% /.test(cov), `full-circle coverage over the camera path: ${cov}`);
+  ok(/traced|✓/.test(cov), `full-circle traced over the camera path: ${cov}`);
   const readout = await page.$eval('#lc-readout', (e) => e.textContent);
   ok(/az \d+° · reticle -?\d+° alt/.test(readout), `live numeric readout present: ${readout}`);
   await shot('livecapture.png');

@@ -1,7 +1,7 @@
 // Horizon Planner service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v16'; // WIP: location search/welcome + iOS compass fix + live-view overflow (unreleased)
+const CACHE = 'horizon-v17'; // WIP: sweep completion by gap + trace feedback (unreleased)
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',

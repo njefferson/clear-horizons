@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {
   wrapOffset, headingFromAlpha, cameraPointing, calibrationOffset,
   applyOffset, sunCalibration, makeSession, addSample, sampleCount,
-  coverage, profileFromSession,
+  coverage, largestGap, profileFromSession,
 } from '../src/model/capture.js';
 import { makeObserver } from '../src/model/astro.js';
 import { sampleAt } from '../src/model/horizon.js';
@@ -76,6 +76,20 @@ test('coverage reports filled bins and the widest wrap-aware gap', () => {
   for (let az = 350; az < 360; az++) addSample(w, az + 0.5, 5);
   for (let az = 10; az < 20; az++) addSample(w, az + 0.5, 5);
   assert.equal(coverage(w).maxGapDeg, 330, 'the long way around, not the seam');
+});
+
+test('largestGap locates the widest hole so the UI can point you at it', () => {
+  assert.deepEqual(largestGap(makeSession(1)), { gapDeg: 360, centerAz: 0 }, 'empty → whole circle');
+  const s = makeSession(1);
+  // Fill everything except a block 180–219 (a 40° hole centred on 200°).
+  for (let az = 0; az < 360; az++) if (az < 180 || az >= 220) addSample(s, az + 0.5, 5);
+  const g = largestGap(s);
+  assert.equal(g.gapDeg, 40, 'the untouched 40° block');
+  assert.ok(Math.abs(g.centerAz - 200) <= 1, `gap centre near 200°, got ${g.centerAz}`);
+  // A near-complete sweep with only 1° pinholes → widest gap is tiny (done-ish).
+  const w = makeSession(1);
+  for (let az = 0; az < 360; az += 2) addSample(w, az + 0.5, 5); // every other degree
+  assert.ok(largestGap(w).gapDeg <= 1, 'alternating fills leave only 1° gaps');
 });
 
 test('a synthetic treeline sweep reconstructs the profile; gaps interpolate', () => {
