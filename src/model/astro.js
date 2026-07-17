@@ -15,6 +15,8 @@
 // =============================================================================
 import * as Astronomy from '../vendor/astronomy.js';
 
+const RAD = Math.PI / 180;
+
 // Sun-altitude thresholds (degrees) that bound each twilight band. Standard
 // definitions; the Sun's geometric centre altitude is compared against these.
 export const TWILIGHT = { day: 0, civil: -6, nautical: -12, astronomical: -18 };
@@ -31,15 +33,20 @@ function time(t) { return Astronomy.MakeTime(t); }
 // ('normal', the default) or geometric (the engine wants null, not a string).
 function refOpt(r) { return r === 'none' || r === null ? null : r; }
 
-// A fixed target's J2000 equatorial position → apparent horizontal coords at a
-// site/instant. Rotating the star's EQJ vector to EQD (precession + nutation)
-// and only then to the horizon keeps a J2000 catalog position honest decades
-// from epoch. refraction: 'normal' (apparent, default) | 'none' (geometric).
-function targetHorizon(target, observer, t, refraction) {
+// A fixed target's J2000 catalog position, precessed + nutated to the equator
+// of date — { ra (hours of date), dec (degrees of date) }. Rotating the EQJ
+// vector to EQD keeps a J2000 position honest decades from epoch.
+function targetEQD(target, t) {
   const sph = new Astronomy.Spherical(target.dec, target.ra * 15, 1); // dec, RA°, unit dist
   const eqjVec = Astronomy.VectorFromSphere(sph, t);
   const eqdVec = Astronomy.RotateVector(Astronomy.Rotation_EQJ_EQD(t), eqjVec);
-  const eqd = Astronomy.EquatorFromVector(eqdVec); // ra (hours of date), dec (deg of date)
+  return Astronomy.EquatorFromVector(eqdVec);
+}
+
+// A fixed target's J2000 equatorial position → apparent horizontal coords at a
+// site/instant. refraction: 'normal' (apparent, default) | 'none' (geometric).
+function targetHorizon(target, observer, t, refraction) {
+  const eqd = targetEQD(target, t);
   return Astronomy.Horizon(t, observer, eqd.ra, eqd.dec, refOpt(refraction));
 }
 
@@ -103,6 +110,30 @@ export function moonInfo(observer, date) {
     illumination: illum.phase_fraction,
     phaseName: phaseName(phaseAngle),
   };
+}
+
+/**
+ * Great-circle separation (degrees) between two equatorial positions given as
+ * { ra (hours), dec (degrees) } in the SAME frame. Spherical law of cosines —
+ * fine at indicator precision (the acos is clamped for rounding).
+ */
+export function separationDeg(a, b) {
+  const d1 = a.dec * RAD, d2 = b.dec * RAD;
+  const dRa = (a.ra - b.ra) * 15 * RAD;
+  const c = Math.sin(d1) * Math.sin(d2) + Math.cos(d1) * Math.cos(d2) * Math.cos(dRa);
+  return Math.acos(Math.max(-1, Math.min(1, c))) / RAD;
+}
+
+/**
+ * Angular separation (degrees) between the Moon and a J2000 target at a
+ * site/instant — the "will the Moon wash this out?" number. The Moon is
+ * topocentric of-date; the target is precessed to of-date to match frames.
+ */
+export function moonSeparation(target, observer, date) {
+  const t = time(date);
+  const moon = Astronomy.Equator(Astronomy.Body.Moon, t, observer, /*ofdate*/ true, /*aberration*/ true);
+  const tgt = targetEQD(target, t);
+  return separationDeg({ ra: moon.ra, dec: moon.dec }, { ra: tgt.ra, dec: tgt.dec });
 }
 
 /** Classify a Sun altitude (degrees) into a lighting band. */

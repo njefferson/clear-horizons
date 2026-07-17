@@ -68,7 +68,17 @@ export function loadSites() {
   return sites;
 }
 
-function persist(sites) { writeJSON(SITES_KEY, sites); return sites; }
+function persist(sites) { writeJSON(SITES_KEY, sites); requestPersistence(); return sites; }
+
+/**
+ * Ask the browser to protect this origin's storage from eviction — a measured
+ * horizon is precious data living in localStorage. Called whenever sites are
+ * written (and once at boot when sites exist). Safe to repeat: Chromium grants
+ * silently by engagement heuristics, Firefox may prompt once, others ignore.
+ */
+export function requestPersistence() {
+  try { navigator.storage?.persist?.().catch(() => {}); } catch { /* non-browser (tests) */ }
+}
 
 export function activeSite() {
   const sites = loadSites();

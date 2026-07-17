@@ -260,6 +260,9 @@ a { color: var(--accent); }
 .vis-sub .dim { font-family: var(--mono); }
 .vis-flag { font-family: var(--mono); font-size: 11px; color: var(--warn);
   background: color-mix(in srgb, var(--warn) 14%, transparent); border-radius: 999px; padding: 0 7px; }
+.vis-moon { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.vis-moon.warn { color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent); border-radius: 999px; padding: 0 7px; }
 .vis-eff { flex: 0 0 auto; text-align: right; display: flex; flex-direction: column; gap: 1px; }
 .vis-eff-label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
 .vis-eff-win { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent-ink); }

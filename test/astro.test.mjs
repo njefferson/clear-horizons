@@ -9,8 +9,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   makeObserver, altAz, sunAltAz, moonInfo, twilightBand, twilightAt,
-  riseSet, transit, altitudeCurve, TWILIGHT,
+  riseSet, transit, altitudeCurve, separationDeg, moonSeparation, TWILIGHT,
 } from '../src/model/astro.js';
+import * as Astronomy from '../src/vendor/astronomy.js';
 
 // Bay Area site; a couple of arbitrary instants spread around a night.
 const SITE = { lat: 37.5, lon: -122.0 };
@@ -96,6 +97,31 @@ test('twilightAt agrees with a direct Sun-altitude classification', () => {
   const band = twilightAt(obs, T_EVENING);
   const direct = twilightBand(sunAltAz(obs, T_EVENING).altitude);
   assert.equal(band, direct);
+});
+
+test('separationDeg obeys the spherical identities', () => {
+  const p = { ra: 3.25, dec: 12.5 };
+  near(separationDeg(p, p), 0, 1e-9, 'coincident points');
+  near(separationDeg({ ra: 0, dec: 0 }, { ra: 6, dec: 0 }, 0), 90, 1e-9, '6h apart on the equator');
+  near(separationDeg({ ra: 0, dec: 90 }, { ra: 12, dec: -90 }), 180, 1e-9, 'pole to pole');
+  near(separationDeg({ ra: 5, dec: 30 }, { ra: 17, dec: 30 }), 120, 1e-9, 'antipodal RA at dec 30 → 2·(90−30)');
+});
+
+test('moonSeparation ≈ 0 against the Moon\'s own position mapped back to J2000', () => {
+  // Build a J2000 "target" from the Moon's topocentric of-date position by
+  // inverting the same EQD rotation astro.js applies — the round trip proves
+  // both bodies land in one frame before the separation is measured.
+  const t = Astronomy.MakeTime(T_EVENING);
+  const eq = Astronomy.Equator(Astronomy.Body.Moon, t, obs, true, true);
+  const sph = new Astronomy.Spherical(eq.dec, eq.ra * 15, 1);
+  const eqdVec = Astronomy.VectorFromSphere(sph, t);
+  const eqjVec = Astronomy.RotateVector(Astronomy.Rotation_EQD_EQJ(t), eqdVec);
+  const eqj = Astronomy.EquatorFromVector(eqjVec);
+  const sep = moonSeparation({ ra: eqj.ra, dec: eqj.dec }, obs, T_EVENING);
+  near(sep, 0, 0.01, 'moon vs itself');
+  // And a real target stays inside the geometric range.
+  const v = moonSeparation(VEGA, obs, T_EVENING);
+  assert.ok(v >= 0 && v <= 180, `Vega–Moon separation in [0,180]: ${v}`);
 });
 
 test('altitudeCurve: inclusive endpoints, right cadence, values match altAz', () => {

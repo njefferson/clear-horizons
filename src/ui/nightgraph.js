@@ -10,7 +10,7 @@
 // and a light overlay (just the scrub cursor) so scrubbing stays cheap.
 // =============================================================================
 import { el, clear } from './dom.js';
-import { makeObserver, altitudeCurve, moonAltAz, moonInfo } from '../model/astro.js';
+import { makeObserver, altitudeCurve, moonAltAz, moonInfo, moonSeparation } from '../model/astro.js';
 import { makeHorizon, isAbove, isFlat } from '../model/horizon.js';
 import { visibility } from '../model/visibility.js';
 import { activeInstrument } from '../model/instruments.js';
@@ -256,6 +256,23 @@ function visibilitySection(series, observer, profile, win, instrument) {
     if (v.clipsDeadZone) flags.push('clips zenith');
     if (!isFlat(profile) && v.effective.length && v.geometric.length &&
         totalEff(v.effective) < totalEff(v.geometric)) flags.push('trimmed by horizon');
+
+    // Moon interference, judged at the moment you'd actually shoot: the middle
+    // of the first effective window (else transit, else mid-night). Shown only
+    // while the Moon is up; flagged when close AND bright — < 25° separation
+    // with ≥ 40% illumination is the usual wash-out rule of thumb.
+    const ref = v.effective.length
+      ? new Date((v.effective[0].start.getTime() + v.effective[0].end.getTime()) / 2)
+      : (v.transit ? v.transit.time : midOf(win));
+    const mi = moonInfo(observer, ref);
+    let moonChip = null;
+    if (mi.altitude > 0) {
+      const sep = moonSeparation({ ra: s.target.ra, dec: s.target.dec }, observer, ref);
+      moonChip = el('span.vis-moon', {
+        class: sep < 25 && mi.illumination >= 0.4 ? 'warn' : '',
+        title: `Moon ${Math.round(mi.illumination * 100)}% lit, ${Math.round(sep)}° from this target at ${hm(ref)}`,
+      }, `☾ ${Math.round(sep)}°`);
+    }
     return el('div.vis-row', {}, [
       el('span.vis-dot', { style: `background:${s.color}` }),
       el('div.vis-main', {}, [
@@ -264,6 +281,7 @@ function visibilitySection(series, observer, profile, win, instrument) {
           el('span.dim', {}, geo),
           v.transit ? el('span.dim', {}, ` · peak ${v.transit.altitude.toFixed(0)}°`) : null,
           ...flags.map((f) => el('span.vis-flag', {}, f)),
+          moonChip,
         ]),
       ]),
       el('div.vis-eff', {}, v.effective.length
@@ -273,7 +291,7 @@ function visibilitySection(series, observer, profile, win, instrument) {
   });
   return el('section.vis-section', {}, [
     el('h2', {}, 'Visibility tonight'),
-    el('p.dim.small', {}, 'Effective windows are when each target clears your treeline and stays below the mount’s zenith dead-zone — the times you can actually shoot it.'),
+    el('p.dim.small', {}, 'Effective windows are when each target clears your treeline and stays below the mount’s zenith dead-zone — the times you can actually shoot it. ☾ is the Moon’s distance from the target while the Moon is up, flagged when close and bright.'),
     el('div.vis-list', {}, rows),
   ]);
 }

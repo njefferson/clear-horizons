@@ -11,6 +11,7 @@ import { renderSettings } from './ui/settings.js';
 import { renderHorizonEditor } from './ui/horizoneditor.js';
 import { renderTonight } from './ui/nightgraph.js';
 import { renderSites } from './ui/sites.js';
+import { loadSites, requestPersistence } from './model/sites.js';
 
 const state = {
   // default = tonight; the night graph will hang off this once it lands.
@@ -74,6 +75,9 @@ window.addEventListener('hashchange', render);
   mountAbout();        // floating "about" button, available everywhere
   mountThemeToggle();  // floating moon/sun Night Mode toggle, everywhere
   render();
+  // Existing data (sites/horizons predating this call) deserves protection
+  // from storage eviction too — new writes re-request it in model/sites.js.
+  if (loadSites().length) requestPersistence();
 })();
 
 // Register the service worker for offline / installable PWA.
