@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  wrapOffset, headingFromAlpha, topAxisPointing, calibrationOffset,
+  wrapOffset, headingFromAlpha, cameraPointing, calibrationOffset,
   applyOffset, sunCalibration, makeSession, addSample, sampleCount,
   coverage, profileFromSession,
 } from '../src/model/capture.js';
@@ -13,12 +13,15 @@ import { sampleAt } from '../src/model/horizon.js';
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b} (±${tol})`);
 
-test('top-edge pointing: heading = (360 − α) % 360, altitude = β clamped', () => {
-  assert.equal(topAxisPointing(0, 0).heading, 0, 'α 0 → north');
-  assert.equal(topAxisPointing(90, 0).heading, 270, 'α 90 (device CCW) → west');
-  assert.equal(topAxisPointing(-30, 0).heading, 30);
-  assert.equal(topAxisPointing(0, 15).altitude, 15);
-  assert.equal(topAxisPointing(0, 120).altitude, 90, 'past-zenith clamps');
+test('camera pointing: heading = (360 − α) % 360, altitude = β − 90 clamped', () => {
+  assert.equal(cameraPointing(0, 90).heading, 0, 'α 0 → north');
+  assert.equal(cameraPointing(90, 90).heading, 270, 'α 90 (device CCW) → west');
+  assert.equal(cameraPointing(-30, 90).heading, 30);
+  // Phone upright (β 90) → camera level with the horizon → 0°, NOT 90°.
+  assert.equal(cameraPointing(0, 90).altitude, 0, 'upright reads the horizon as 0°');
+  assert.equal(cameraPointing(0, 120).altitude, 30, 'tilt back → obstruction above eye level');
+  assert.equal(cameraPointing(0, 60).altitude, -30, 'tip forward → downhill horizon');
+  assert.equal(cameraPointing(0, 190).altitude, 90, 'past-zenith clamps');
   assert.equal(headingFromAlpha(360), 0);
 });
 

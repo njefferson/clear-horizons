@@ -5,7 +5,7 @@
 // =============================================================================
 import { el, clear } from './dom.js';
 import {
-  loadCatalog, filterCatalog, CATEGORIES,
+  loadCatalog, filterCatalog, CATEGORIES, shortName,
   isFavorite, toggleFavorite,
 } from '../model/catalog.js';
 import { activeInstrument, fovOf } from '../model/instruments.js';
@@ -129,7 +129,7 @@ function row(o) {
     el('div.target-main', {}, [
       el('div.target-name', {}, [
         o.m ? el('span.mbadge', {}, `M${o.m}`) : null,
-        el('span.tname', {}, o.common || o.name),
+        el('span.tname', {}, shortName(o)),
         o.common ? el('span.tsub', {}, o.name) : null,
       ]),
       el('div.target-meta', {}, [

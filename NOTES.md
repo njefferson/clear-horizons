@@ -241,7 +241,33 @@ NEEDS-HIS-HANDS half; the smoke pass drives the whole flow synthetically):**
   Smoke drives the Android path with synthetic orientation events; the real
   compass/drift feel is NEEDS-HIS-HANDS on staging.
 
+## Capture re-envision — live-camera AR (Noah's vision, 2026-07-17 device pass)
+The v1.2 sensor capture works but the aiming model was wrong: it sighted along
+the phone's TOP EDGE, so the horizon read 90° and obstructions ABOVE eye level
+(the common case — a tree taller than you) couldn't be entered. Fixed in
+v1.1.0 to the **camera-pointing** model (altitude = β − 90; point the back
+camera at the target, upright = 0° = horizon, tilt up for tall obstructions,
+down for a downhill treeline). That is the bridge to Noah's real vision, the
+next capture iteration:
+- **Live camera preview** (`getUserMedia`, back camera) fills the screen; you
+  spin in place and drag a **reticle** along the skyline.
+- **AR overlay**: the horizon bar-graph draws OVER the camera image in real
+  time as you set each azimuth — you see the profile take shape on the sky.
+- **Auto-trace (stretch)**: sky-vs-not-sky segmentation logs the skyline as you
+  turn — no manual reticle.
+- **Perfect (stretch)**: capture a stitched **horizon panorama image** exported
+  alongside the az/alt data, importable into other tools (Stellarium landscape,
+  etc.).
+Keep the current sensor path as the no-camera fallback. Device-only,
+NEEDS-HIS-HANDS. Accessibility note (standing order): the reticle needs a
+keyboard/manual-entry equivalent, and the AR bar-graph carries a text/numeric
+readout — the camera overlay is never the sole channel.
+
 ## Roadmap (deferred — post-v1, rough order)
+- **"Visible from this site tonight" filter** (Targets) — SHIPPED v1.1.0 as a
+  first-class filter: the catalog first narrows to what actually clears the
+  measured horizon during dark hours at the active site, THEN the type/mag/
+  size/fit chips narrow further. This is the app's thesis applied to discovery.
 - **Sensor-trace horizon capture** — THE differentiator (see the review: manual
   horizons already exist free; measuring is the moat). Live camera preview +
   crosshair; log (azimuth, altitude) from DeviceOrientation while sweeping the

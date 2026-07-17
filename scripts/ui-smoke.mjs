@@ -147,10 +147,11 @@ await step('capture: synthetic sensor sweep bins, covers the circle, saves', asy
   await page.click('.pa-card .btn:has-text("Enable compass")');
   await page.click('#cap-rec'); // Record (uncalibrated → raw-headings toast, offset 0)
   // Synthetic Android sweep, one event per degree: absolute α with
-  // heading = 360 − α; an 18° south treeline over 4° open sky.
+  // heading = 360 − α; an 18° south treeline over 4° open sky. Camera model:
+  // altitude = β − 90, so a β of 108/94 aims the camera 18°/4° above level.
   await page.evaluate(() => {
     for (let heading = 0; heading < 360; heading++) {
-      const beta = heading >= 170 && heading <= 190 ? 18 : 4;
+      const beta = 90 + (heading >= 170 && heading <= 190 ? 18 : 4);
       window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', {
         alpha: (360 - heading) % 360, beta, gamma: 0, absolute: true,
       }));
@@ -243,6 +244,20 @@ await step('night mode: persists across reload and the checkbox reflects it', as
   // Regression: the checkbox used to render unchecked in dark mode.
   ok(await page.$eval('.theme-checkbox', (e) => e.checked) === true, 'checkbox reflects dark on first render');
   await shot('settings-dark.png');
+});
+
+await step('no view overflows the page width at phone size (iPhone 12/13/14)', async () => {
+  // A single overflowing row (long visibility strings, an un-shrunk canvas)
+  // makes mobile Safari load the whole app zoomed-in — reported on-device.
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const [label, hash] of [['Tonight', '#/'], ['Targets', '#/targets'],
+    ['Horizon', '#/horizon'], ['Polar', '#/polar'], ['Sites', '#/sites'], ['Settings', '#/settings']]) {
+    await page.evaluate((h) => { location.hash = h; }, hash);
+    await page.waitForTimeout(120); // let the async view render settle
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    ok(over <= 1, `${label} overflows by ${over}px at 390px wide`);
+  }
+  await page.setViewportSize({ width: 900, height: 900 });
 });
 
 await step('no uncaught page errors anywhere in the journey', async () => {

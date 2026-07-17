@@ -14,7 +14,7 @@ import { makeObserver, altitudeCurve, moonAltAz, moonInfo, moonSeparation } from
 import { makeHorizon, isAbove, isFlat } from '../model/horizon.js';
 import { visibility } from '../model/visibility.js';
 import { activeInstrument } from '../model/instruments.js';
-import { loadCatalog, favoriteIds } from '../model/catalog.js';
+import { loadCatalog, favoriteIds, shortName } from '../model/catalog.js';
 import { activeSite } from '../model/sites.js';
 import { nightWindow, sampleTwilight } from '../model/night.js';
 
@@ -202,7 +202,7 @@ function drawScrub(ctx, s, ms, series, profile, observer, readout) {
     const p = nearest(ser.pts, ms);
     if (!p) continue;
     if (p.up) { ctx.fillStyle = ser.color; ctx.beginPath(); ctx.arc(x, s.y(p.alt), 3.5, 0, 7); ctx.fill(); }
-    rows.push({ color: ser.color, name: ser.target.common || ser.target.name, alt: p.alt, vis: p.vis, up: p.up });
+    rows.push({ color: ser.color, name: shortName(ser.target), alt: p.alt, vis: p.vis, up: p.up });
   }
   readout.replaceChildren(
     el('div.ng-ro-time', {}, hourLabelFull(ms)),
@@ -235,7 +235,7 @@ function buildLegend(series, moonNow) {
   return el('div.ng-legend', {}, [
     ...series.map((s) => el('span.ng-leg', {}, [
       el('span.ng-leg-dot', { style: `background:${s.color}` }),
-      el('span', {}, s.target.common || s.target.name),
+      el('span', {}, shortName(s.target)),
     ])),
     el('span.ng-leg', {}, [
       el('span.ng-leg-dot.moon', {}, ''),
@@ -256,6 +256,7 @@ function visibilitySection(series, observer, profile, win, instrument) {
     if (v.clipsDeadZone) flags.push('clips zenith');
     if (!isFlat(profile) && v.effective.length && v.geometric.length &&
         totalEff(v.effective) < totalEff(v.geometric)) flags.push('trimmed by horizon');
+    if (v.effectiveDropped > 0) flags.push(`${v.effectiveDropped} brief peek${v.effectiveDropped === 1 ? '' : 's'} dropped`);
 
     // Moon interference, judged at the moment you'd actually shoot: the middle
     // of the first effective window (else transit, else mid-night). Shown only
@@ -268,15 +269,18 @@ function visibilitySection(series, observer, profile, win, instrument) {
     let moonChip = null;
     if (mi.altitude > 0) {
       const sep = moonSeparation({ ra: s.target.ra, dec: s.target.dec }, observer, ref);
+      const washed = sep < 25 && mi.illumination >= 0.4;
+      // The warning must not ride on color alone: add "· close" text so the
+      // caution reads without seeing the colour (accessibility standing order).
       moonChip = el('span.vis-moon', {
-        class: sep < 25 && mi.illumination >= 0.4 ? 'warn' : '',
+        class: washed ? 'warn' : '',
         title: `Moon ${Math.round(mi.illumination * 100)}% lit, ${Math.round(sep)}° from this target at ${hm(ref)}`,
-      }, `☾ ${Math.round(sep)}°`);
+      }, [el('span', { 'aria-hidden': 'true' }, '☾ '), `${Math.round(sep)}°${washed ? ' · close' : ''}`]);
     }
     return el('div.vis-row', {}, [
       el('span.vis-dot', { style: `background:${s.color}` }),
       el('div.vis-main', {}, [
-        el('div.vis-name', {}, s.target.common || s.target.name),
+        el('div.vis-name', {}, shortName(s.target)),
         el('div.vis-sub', {}, [
           el('span.dim', {}, geo),
           v.transit ? el('span.dim', {}, ` · peak ${v.transit.altitude.toFixed(0)}°`) : null,

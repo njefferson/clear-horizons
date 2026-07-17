@@ -43,9 +43,16 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink);
   font-family: var(--sans); font-size: 15px; line-height: 1.45; }
+/* No element may push the page wider than the viewport — a single overflowing
+   row makes mobile Safari load the whole app zoomed-in (reported on-device). */
+html { overflow-x: hidden; }
 /* Clear the floating dock: its height + 10px float + a little breathing room. */
 body { padding-bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); }
-.view { max-width: 760px; margin: 0 auto; padding: 12px 12px 24px; }
+/* padding-top clears the translucent iOS status bar (clock/battery) in the
+   installed PWA — the content column, like the floating buttons, must sit
+   below the safe-area inset or the h1 renders under the system clock. */
+.view { max-width: 760px; margin: 0 auto;
+  padding: calc(12px + env(safe-area-inset-top)) 12px 24px; }
 
 h1 { font-size: 22px; margin: 0; font-family: var(--serif); font-weight: 600; }
 h2 { font-size: 16px; margin: 0 0 6px; }
@@ -264,9 +271,12 @@ a { color: var(--accent); }
 .vis-moon { font-family: var(--mono); font-size: 11px; color: var(--dim); }
 .vis-moon.warn { color: var(--warn);
   background: color-mix(in srgb, var(--warn) 14%, transparent); border-radius: 999px; padding: 0 7px; }
-.vis-eff { flex: 0 0 auto; text-align: right; display: flex; flex-direction: column; gap: 1px; }
-.vis-eff-label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
-.vis-eff-win { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent-ink); }
+/* Shrinkable + wrap: effective-window text can be several ranges long; it must
+   never force the row (and the page) wider than the viewport. */
+.vis-eff { flex: 0 1 auto; min-width: 0; text-align: right; display: flex; flex-direction: column; gap: 1px; }
+.vis-eff-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
+.vis-eff-win { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600;
+  color: var(--accent-ink); overflow-wrap: anywhere; }
 .vis-none { font-family: var(--mono); font-size: 12px; color: var(--dim); }
 
 /* ── Sites manager ───────────────────────────────────────────────────────── */

@@ -32,17 +32,25 @@ export function wrapOffset(deg) {
   return d > 180 ? d - 360 : d;
 }
 
-/** Android path: compass heading of the top edge from an ABSOLUTE alpha. */
+/** Android path: compass heading from an ABSOLUTE alpha. */
 export function headingFromAlpha(alpha) { return norm360(360 - alpha); }
 
 /**
- * Where the top edge points, from device Euler angles.
+ * Where the BACK CAMERA points, from device Euler angles. You hold the phone
+ * upright (portrait) and aim the camera at the obstruction, the way you'd take
+ * a photo of it — NOT sighting along the top edge (that was the v1.2 model; it
+ * read the horizon as 90° and couldn't reach obstructions above eye level).
+ *
+ * The camera looks along the device −Z axis. With the phone vertical, iOS/
+ * Android `beta` ≈ 90°, so camera-elevation = beta − 90: upright → 0° (level
+ * with the horizon), tilt the top back → positive (a tall tree above you),
+ * tip it forward → negative (a treeline downhill). Range clamps to [−90, 90].
  * @returns { heading (° cw from north, magnetic), altitude (°, [−90, 90]) }
  */
-export function topAxisPointing(alpha, beta) {
+export function cameraPointing(alpha, beta) {
   return {
     heading: headingFromAlpha(alpha),
-    altitude: Math.max(-90, Math.min(90, beta)),
+    altitude: Math.max(-90, Math.min(90, beta - 90)),
   };
 }
 

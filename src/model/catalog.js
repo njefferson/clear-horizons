@@ -20,6 +20,18 @@ export const CATEGORIES = ['Galaxy', 'Cluster', 'Nebula'];
 
 export function categoryOf(obj) { return CATEGORY[obj.typeLabel] || 'Other'; }
 
+/**
+ * Display name for a catalog object: its first common name, else the catalog
+ * id. OpenNGC packs multiple common names into one comma-joined string
+ * ("Triangulum Galaxy,Triangulum Pinwheel") — showing only the first keeps
+ * rows and legends readable. The full `common` string stays searchable
+ * (see filterCatalog).
+ */
+export function shortName(obj) {
+  if (obj.common) return obj.common.split(',')[0].trim();
+  return obj.name;
+}
+
 let _cache = null;
 /** Load + memoise the bundled catalog. Resolves to the array of objects. */
 export async function loadCatalog() {

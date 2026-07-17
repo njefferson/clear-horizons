@@ -51,7 +51,7 @@ export function renderCapture(app, state, nav) {
   root.append(
     el('div.pa-head', {}, [
       el('h1', {}, 'Measure horizon'),
-      el('p.dim.small', {}, 'Hold the phone upright and sight along its top edge at the treeline, like a gunsight. Portrait orientation.'),
+      el('p.dim.small', {}, 'Hold the phone upright and point the back camera at the treeline, the way you’d photograph it. Tip it up for a tall obstruction, down for a downhill horizon — the altitude readout follows where the camera looks.'),
       el('div.row-actions', {}, [el('button.chip.ng-site', { onclick: () => nav.go('#/sites') }, `📍 ${site.name}`)]),
     ]),
     sensorsCard(),
@@ -65,7 +65,7 @@ export function renderCapture(app, state, nav) {
 
 // --- 1 · sensors --------------------------------------------------------------
 function sensorsCard() {
-  const enableBtn = el('button.btn.primary', { onclick: enableSensors },
+  const enableBtn = el('button.btn.primary', { id: 'cap-enable', onclick: enableSensors },
     cap.enabled ? 'Sensors on' : 'Enable compass & tilt');
   return el('section.pa-card', {}, [
     el('h2', {}, '1 · Sensors'),
@@ -107,7 +107,7 @@ function onOrientation(e) {
     cap.source = (e.absolute || e.type === 'deviceorientationabsolute') ? 'absolute' : 'relative';
   }
   if (heading == null || e.beta == null) return;
-  cap.last = { heading, altitude: Math.max(-90, Math.min(90, e.beta)) }; // = topAxisPointing's clamp
+  cap.last = { heading, altitude: Math.max(-90, Math.min(90, e.beta - 90)) }; // camera axis
   if (cap.recording) addSample(cap.session, applyOffset(heading, cap.offset), cap.last.altitude);
   schedule();
 }
@@ -136,7 +136,7 @@ function calibrateCard(site) {
   });
   return el('section.pa-card', {}, [
     el('h2', {}, '2 · Calibrate (compass truth)'),
-    el('p.dim.small', {}, 'Device headings are magnetic and locally disturbed — up to ~±15° off true north. One sighting of the Sun fixes it: aim the top edge at the Sun, then tap.'),
+    el('p.dim.small', {}, 'Device headings are magnetic and locally disturbed — up to ~±15° off true north. One sighting of the Sun fixes it: point the camera at the Sun (through a safe filter — never look straight at it), then tap.'),
     el('div.card-actions', {}, [
       el('button.btn.primary', { onclick: () => calibrateFromSun(site) }, '☀ Sighting the Sun — calibrate'),
     ]),
@@ -237,6 +237,8 @@ function repaint() {
   set('cap-cal', calText());
   set('cap-cov', covText());
   set('cap-preview', previewText());
+  const enable = root.querySelector('#cap-enable');
+  if (enable) enable.textContent = cap.enabled ? 'Sensors on' : 'Enable compass & tilt';
   const rec = root.querySelector('#cap-rec');
   if (rec) { rec.textContent = cap.recording ? '■ Stop' : '● Record'; rec.classList.toggle('rec', cap.recording); }
   const strip = root.querySelector('#cap-strip');

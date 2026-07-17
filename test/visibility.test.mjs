@@ -10,7 +10,39 @@ globalThis.localStorage = (() => {
 const { makeObserver } = await import('../src/model/astro.js');
 const { makeHorizon } = await import('../src/model/horizon.js');
 const { instrumentById } = await import('../src/model/instruments.js');
-const { visibility, totalMinutes } = await import('../src/model/visibility.js');
+const { visibility, totalMinutes, consolidateIntervals } = await import('../src/model/visibility.js');
+
+const iv = (a, b) => ({ start: new Date(a), end: new Date(b) }); // minutes → interval
+const M = (m) => m * 60000;
+
+test('consolidateIntervals merges tiny gaps then drops brief windows', () => {
+  // A jagged treeline yields chatter: 4-min pass, 2-min gap, 2-min pass, big gap, 30-min pass.
+  const chatter = [iv(M(0), M(4)), iv(M(6), M(8)), iv(M(100), M(130))];
+  const { list, dropped } = consolidateIntervals(chatter, { mergeGapMinutes: 6, minWindowMinutes: 10 });
+  assert.equal(list.length, 1, 'the first two merge (8-min span) but fall under 10 min → dropped; only the 30-min survives');
+  assert.equal(dropped, 1);
+  assert.equal(list[0].start.getTime(), M(100));
+});
+
+test('consolidateIntervals joins a sub-gap into one shootable window', () => {
+  const merged = consolidateIntervals([iv(M(0), M(20)), iv(M(24), M(50))], { mergeGapMinutes: 6, minWindowMinutes: 10 });
+  assert.equal(merged.list.length, 1, '4-min dip is shot through');
+  assert.equal(merged.list[0].end.getTime(), M(50));
+  assert.equal(merged.dropped, 0);
+});
+
+test('consolidateIntervals keeps a wide gap as two windows', () => {
+  const { list } = consolidateIntervals([iv(M(0), M(20)), iv(M(60), M(90))], { mergeGapMinutes: 6, minWindowMinutes: 10 });
+  assert.equal(list.length, 2, '40-min gap is a real break');
+});
+
+test('visibility consolidates effective and reports dropped brief windows', () => {
+  // A 20° wall gives clean windows (no chatter) — dropped is 0 but the field exists.
+  const trees = makeHorizon(Array(36).fill(20));
+  const v = visibility(midDec, obs, trees, { ...win });
+  assert.equal(typeof v.effectiveDropped, 'number');
+  for (const w of v.effective) assert.ok(w.end - w.start >= M(10) - 1, 'no sub-10-min windows survive');
+});
 
 const obs = makeObserver(40, 0, 0);
 const S50 = instrumentById('s50'); // zenith dead-zone 85°
