@@ -18,7 +18,8 @@
 
 export const STEP = 10;          // manual-editor grid: degrees per handle
 export const N = 360 / STEP;     // 36 handles
-export const ALT_MIN = -30;      // depressed horizons exist; sensor floor
+export const ALT_MIN = -60;      // depressed horizons (hilltops, downhill, low
+                                 // obstructions) go steep; floor short of straight-down
 export const ALT_MAX = 90;
 
 const clampAlt = (a) => Math.max(ALT_MIN, Math.min(ALT_MAX, a));

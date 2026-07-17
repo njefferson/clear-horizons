@@ -48,8 +48,9 @@ test('sampleAt interpolates across the 350°→0° north seam', () => {
 });
 
 test('negative altitudes survive (floored at ALT_MIN) and isAbove respects them', () => {
-  const p = makeHorizon([[0, -45], [180, -5]]);
-  assert.equal(sampleAt(p, 0), ALT_MIN);          // −45 floors at −30
+  const p = makeHorizon([[0, -75], [90, -45], [180, -5]]);
+  assert.equal(sampleAt(p, 0), ALT_MIN);          // −75 floors at −60
+  assert.equal(sampleAt(p, 90), -45);             // −45 now survives (below the old −30 floor)
   assert.equal(sampleAt(p, 180), -5);
   assert.ok(isAbove(p, 180, -2), 'a target at −2° clears a −5° horizon');
   assert.ok(!isAbove(p, 180, -8), 'but not below it');
