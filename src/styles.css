@@ -4,10 +4,11 @@
    :root tokens (never hex-in-place), IBM Plex with mono for every number. */
 :root {
   --bg: #ebe1cf; --bg2: #f2ead9; --card: #faf4e8; --card2: #f2ead9;
-  --ink: #2c2318; --dim: #8a7b64; --line: #e2d6bf; --track: #e6dcc7;
+  --ink: #2c2318; --dim: #6b5d47; --line: #e2d6bf; --track: #e6dcc7;
   --accent: #b07bd6; --accent-ink: #5a3580; --accent-wash: #efe4f6; --accent2: #7b57c4;
-  --slate: #3f77a4; --slate-wash: #dbe7f0; --warn: #a9781f; --live: #c0563a;
+  --slate: #3f77a4; --slate-wash: #dbe7f0; --warn: #8a6212; --live: #c0563a;
   --danger: #9c3320; --danger-dim: #7a2e2e;
+  --park: #2b7449;  /* "fits" tier + clear-flag green — contrast-safe text (was an undefined var) */
   /* Tab dock — its own neutral surface with light glyphs, so it can't be
      mistaken for the cards or the page in either theme. */
   --dock: #6a5f7e;
@@ -15,7 +16,7 @@
   --dock-shadow: 0 1px 2px rgba(30,20,40,.22), 0 8px 18px rgba(30,20,40,.18), 0 22px 44px rgba(30,20,40,.24);
   --dock-lip: inset 0 1px 0 rgba(255,255,255,.16);
   --tab-ink: #efe6f4;
-  --tab-ink-active: #d9b8f5;
+  --tab-ink-active: #f0e6ff;
   /* Type superfamily — IBM Plex (serif = wordmark/titles, sans = chrome,
      mono = every number). */
   --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -38,6 +39,7 @@
   --dock-lip: inset 0 1px 0 rgba(255,255,255,.08);
   --tab-ink: #d7d2e8;
   --tab-ink-active: #c39be8;
+  --park: #88dba7;
 }
 
 * { box-sizing: border-box; }
@@ -176,7 +178,7 @@ a { color: var(--accent); }
 .target-meta .tnum { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .tier { flex: 0 0 auto; font-family: var(--mono); font-size: 12px; font-weight: 600;
   border-radius: 999px; padding: 3px 10px; }
-.tier.fits { color: var(--park, #5fae79); background: color-mix(in srgb, #5fae79 16%, var(--card));
+.tier.fits { color: var(--park); background: color-mix(in srgb, #5fae79 16%, var(--card));
   border: 1px solid color-mix(in srgb, #5fae79 34%, transparent); }
 .tier.mosaic { color: var(--accent-ink); background: var(--accent-wash);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -197,7 +199,7 @@ a { color: var(--accent); }
 .toggle-row.small-gap { font-size: 13px; }
 .inst-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .inst-name { font-weight: 600; font-size: 15px; }
-.inst-active { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+.inst-active { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
   color: #12131c; background: var(--accent); border-radius: 999px; padding: 2px 8px; }
 .inst-specs { display: flex; flex-direction: column; gap: 3px; }
 .spec { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
@@ -252,7 +254,7 @@ a { color: var(--accent); }
 .ng-ro-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ng-ro-alt { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .ng-ro-flag { font-size: 11px; font-family: var(--mono); }
-.ng-ro-flag.ok { color: var(--park, #5fae79); }
+.ng-ro-flag.ok { color: var(--park); }
 .ng-ro-flag.no { color: var(--dim); }
 
 /* location dialog */
@@ -301,7 +303,7 @@ a { color: var(--accent); }
 .site-main { flex: 1 1 auto; min-width: 0; text-align: left; background: none; border: 0;
   color: var(--ink); cursor: pointer; padding: 4px 0; }
 .site-name { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
-.site-active { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+.site-active { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
   color: #12131c; background: var(--accent); border-radius: 999px; padding: 2px 8px; }
 .site-meta { font-size: 12px; color: var(--dim); margin-top: 1px; }
 .site-actions { display: flex; gap: 6px; flex: 0 0 auto; }

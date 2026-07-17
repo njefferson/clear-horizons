@@ -1,6 +1,8 @@
-# Headless checks on every push / PR: the Node unit tests and the catalog
-# validate gate. No build step (no-build vanilla ES modules); no network — the
-# committed catalog.json is validated as-is.
+# Headless checks on every push / PR: the Node unit tests, the catalog validate
+# gate, and the WCAG contrast gate (accessibility standing order — colour is
+# decided by computation, in CI). No build step (no-build vanilla ES modules);
+# no network. The axe view-scan (npm run test:a11y) needs a browser, so it runs
+# in the release ritual alongside the UI smoke rather than here.
 name: CI
 
 on:
@@ -21,3 +23,5 @@ jobs:
         run: node --test
       - name: Validate bundled catalog
         run: node scripts/build-catalog.mjs validate
+      - name: Contrast gate (WCAG AA, both themes)
+        run: node scripts/check-contrast.mjs

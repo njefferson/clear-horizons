@@ -178,11 +178,16 @@ function drawBase(ctx, s, { twilight, series, moonPts }) {
   // twilight bands, and a marker shape carries identity without colour.
   const labelPeaks = series.length <= 4; // direct labels only when uncluttered
   for (const ser of series) {
-    ctx.globalAlpha = 0.32; ctx.strokeStyle = ser.color; ctx.lineWidth = 2;
-    strokeCurve(ctx, s, ser.pts, true);          // full up-portion, faint
+    // A dark casing under EVERY drawn segment (faint + solid) guarantees each
+    // line pixel sits on the dark casing colour, not on a light twilight band —
+    // so contrast holds regardless of which band the curve crosses.
+    ctx.globalAlpha = 1; ctx.strokeStyle = CASE; ctx.lineWidth = 4;
+    strokeCurve(ctx, s, ser.pts, true);          // casing under the full up-portion
+    ctx.globalAlpha = 0.42; ctx.strokeStyle = ser.color; ctx.lineWidth = 2;
+    strokeCurve(ctx, s, ser.pts, true);          // up-but-blocked, faint
     ctx.globalAlpha = 1;
     ctx.strokeStyle = CASE; ctx.lineWidth = 4;
-    strokeVisible(ctx, s, ser.pts);              // casing
+    strokeVisible(ctx, s, ser.pts);              // casing under the visible run
     ctx.strokeStyle = ser.color; ctx.lineWidth = 2;
     strokeVisible(ctx, s, ser.pts);              // above-horizon runs, solid
     drawMarksAlong(ctx, s, ser);                 // shape markers on the visible run
