@@ -28,7 +28,7 @@ import { makeObserver, moonInfo } from '../model/astro.js';
 import { makeHorizon, sampleAt, isAbove, isFlat } from '../model/horizon.js';
 import { nightWindow } from '../model/night.js';
 import { declination } from '../model/geomag.js';
-import { headingFromAlpha, applyOffset } from '../model/capture.js';
+import { backCameraAzAlt, applyOffset, wrapOffset } from '../model/capture.js';
 import { DEFAULT_FOV, projectPoint, horizonPolyline } from '../model/arproject.js';
 import { loadCatalog, favoriteIds } from '../model/catalog.js';
 import { buildSkyScene, positionAt } from '../model/skyview.js';
@@ -37,6 +37,9 @@ const STEP_MIN = 5;        // arc sampling cadence
 const MAX_TARGETS = 8;     // matches the night graph's cap
 const MOON = '#e3e7f3';    // moon glyph fill (light disc; label carries the phase text)
 const MOON_DARK = '#0b0e17';
+// iOS webkitCompassHeading is only trustworthy while the phone isn't steeply
+// pitched; re-anchor true north to it only within this altitude band, then hold.
+const COMPASS_RELIABLE_ALT = 35;
 
 // View-scoped state, rebuilt each mount; the camera/loop reset with it.
 let sv = null;
@@ -47,7 +50,8 @@ function freshState() {
   return {
     mode: 'ar',            // 'ar' (camera overlay) | 'flat' (az/alt chart)
     stream: null, source: null, cam: null, oriAttached: false,
-    offset: 0, declination: 0, fov: { ...DEFAULT_FOV }, raf: 0,
+    iosNorthOffset: null,  // α-frame → magnetic-north offset, anchored from the compass
+    declination: 0, fov: { ...DEFAULT_FOV }, raf: 0,
     observer: null, profile: null, win: null,
     scene: [], scrubMs: 0,
     arCanvas: null, flatCanvas: null,
@@ -78,7 +82,6 @@ export async function renderSky(app, state, nav) {
   sv.profile = makeHorizon(site.horizon);
   sv.win = nightWindow(sv.observer, state.night);
   sv.declination = declination(site.lat, site.lon);
-  sv.offset = sv.declination;
 
   const favIds = favoriteIds();
   const targets = objects.filter((o) => favIds.has(o.id)).slice(0, MAX_TARGETS);
@@ -286,16 +289,27 @@ function detachOrientation() {
   if (sv) sv.oriAttached = false;
 }
 function onOrientation(e) {
-  if (!sv) return;
-  let heading = null;
-  if (e.webkitCompassHeading != null) { heading = e.webkitCompassHeading; sv.source = 'ios'; }
-  else if (e.alpha != null) {
-    heading = headingFromAlpha(e.alpha);
+  if (!sv || e.alpha == null || e.beta == null) return;
+  // Derive the camera axis from the FULL orientation — azimuth stays put when you
+  // pitch the phone up, instead of taking it from the compass (which flips ~180°
+  // past ~45° on iOS). See model/capture.js:backCameraAzAlt.
+  const { azimuth: azRel, altitude: alt } = backCameraAzAlt(e.alpha, e.beta, e.gamma == null ? 0 : e.gamma);
+  let magAz; // azimuth referenced to MAGNETIC north
+  if (e.webkitCompassHeading != null) {
+    sv.source = 'ios';
+    // iOS α is relative; webkitCompassHeading is absolute-magnetic but only
+    // trustworthy while the phone isn't steeply pitched. Anchor the α-frame to it
+    // when reliable (and seed once), then HOLD the offset through steep tilts — α
+    // still tracks body rotation, so azimuth stays live without the flip.
+    if (sv.iosNorthOffset == null || Math.abs(alt) <= COMPASS_RELIABLE_ALT) {
+      sv.iosNorthOffset = wrapOffset(e.webkitCompassHeading - azRel);
+    }
+    magAz = applyOffset(azRel, sv.iosNorthOffset);
+  } else {
     sv.source = (e.absolute || e.type === 'deviceorientationabsolute') ? 'absolute' : 'relative';
+    magAz = azRel; // Android absolute α is already magnetic-north-referenced
   }
-  if (heading == null || e.beta == null) return;
-  const alt = Math.max(-90, Math.min(90, e.beta - 90)); // camera-pointing model
-  sv.cam = { az: applyOffset(heading, sv.offset), alt };
+  sv.cam = { az: applyOffset(magAz, sv.declination), alt };
 }
 
 // --- scrub -------------------------------------------------------------------

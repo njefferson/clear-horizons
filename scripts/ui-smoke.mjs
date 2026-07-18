@@ -370,6 +370,24 @@ await step('sky (AR): "View in sky" opens #/sky; camera overlay, Moon in the lis
   await page.waitForFunction(() => document.querySelector('#sky-cta')?.hidden === true);
   ok(await page.$eval('#sky-cta', (e) => e.hidden), 'compass cue hidden once the sky locks on');
 
+  // Regression (v2.0.1): the iOS compass path must NOT flip azimuth when pitched
+  // past ~45°. Anchor true north from a near-level reading, then feed a steeply
+  // pitched event whose webkitCompassHeading has bogusly FLIPPED — azimuth holds.
+  const iosEvt = (alpha, beta, heading) => page.evaluate(({ alpha, beta, heading }) => {
+    const ev = new DeviceOrientationEvent('deviceorientation', { alpha, beta, gamma: 0 });
+    Object.defineProperty(ev, 'webkitCompassHeading', { value: heading, configurable: true });
+    window.dispatchEvent(ev);
+  }, { alpha, beta, heading });
+  const azOf = () => page.$eval('#sky-readout', (e) => { const m = (e.textContent || '').match(/az (\d+)°/); return m ? Number(m[1]) : null; });
+  await iosEvt(180, 90, 72);   // near level → anchors north to compass heading 72°
+  await page.waitForFunction(() => /· alt -?0°/.test(document.querySelector('#sky-readout')?.textContent || ''));
+  const azLevel = await azOf();
+  await iosEvt(180, 140, 250); // pitched ~50° up, compass now bogusly flipped to 250°
+  await page.waitForFunction(() => /· alt 5\d°/.test(document.querySelector('#sky-readout')?.textContent || ''));
+  const azPitched = await azOf();
+  const flip = Math.min(Math.abs(azPitched - azLevel), 360 - Math.abs(azPitched - azLevel));
+  ok(flip <= 5, `iOS azimuth holds through a steep pitch — no flip (level ${azLevel}° → pitched ${azPitched}°, Δ ${flip}°)`);
+
   // Hour scrubber is a native range with a keyboard path; arrow steps advance
   // the clock and its aria-valuetext.
   await page.focus('.sky-range');

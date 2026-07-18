@@ -53,6 +53,39 @@ export function cameraPointing(alpha, beta) {
   };
 }
 
+const RAD = Math.PI / 180;
+
+/**
+ * Where the BACK CAMERA points, from the FULL device orientation (α, β, γ) — the
+ * robust pointing the AR sky view needs when you tilt the phone up to the sky.
+ *
+ * The naive model (heading = compass, altitude = β − 90) ignores the coupling
+ * between tilt and heading: iOS `webkitCompassHeading` destabilises and flips
+ * ~180° once the phone is pitched past ~45°. Here we instead rotate the camera
+ * axis (device −Z) into the world by the W3C Z-X′-Y″ matrix and read azimuth +
+ * altitude straight off the world vector — which is invariant under pitch (a
+ * level phone and one tilted 45° up return the SAME azimuth at zero roll), so
+ * there is no flip. Degenerate only at the exact zenith, where azimuth is
+ * genuinely undefined.
+ *
+ * The azimuth is in the α reference frame (cw from that frame's north): on
+ * Android's ABSOLUTE α it is already magnetic-north-referenced; on iOS α is
+ * relative, so the caller anchors it to true north with `webkitCompassHeading`
+ * sampled while the phone is near level (where the compass is trustworthy).
+ * @returns { azimuth (° cw from the α-frame north, [0,360)), altitude (°, [−90,90]) }
+ */
+export function backCameraAzAlt(alpha, beta, gamma) {
+  const a = alpha * RAD, b = beta * RAD, g = gamma * RAD;
+  // Back camera = device −Z expressed in the world frame (x east, y north, z up).
+  const east = -(Math.cos(a) * Math.sin(g) + Math.sin(a) * Math.sin(b) * Math.cos(g));
+  const north = -(Math.sin(a) * Math.sin(g) - Math.cos(a) * Math.sin(b) * Math.cos(g));
+  const up = -(Math.cos(b) * Math.cos(g));
+  return {
+    azimuth: norm360(Math.atan2(east, north) / RAD),
+    altitude: Math.max(-90, Math.min(90, Math.asin(Math.max(-1, Math.min(1, up))) / RAD)),
+  };
+}
+
 /** The calibration offset that maps a measured heading onto a true azimuth. */
 export function calibrationOffset(trueAzimuth, measuredHeading) {
   return wrapOffset(trueAzimuth - measuredHeading);

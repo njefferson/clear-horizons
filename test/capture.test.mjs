@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  wrapOffset, headingFromAlpha, cameraPointing, calibrationOffset,
+  wrapOffset, headingFromAlpha, cameraPointing, backCameraAzAlt, calibrationOffset,
   applyOffset, makeSession, addSample, sampleCount,
   coverage, largestGap, profileFromSession,
 } from '../src/model/capture.js';
@@ -22,6 +22,40 @@ test('camera pointing: heading = (360 − α) % 360, altitude = β − 90 clampe
   assert.equal(cameraPointing(0, 60).altitude, -30, 'tip forward → downhill horizon');
   assert.equal(cameraPointing(0, 190).altitude, 90, 'past-zenith clamps');
   assert.equal(headingFromAlpha(360), 0);
+});
+
+test('backCameraAzAlt: level identities (az = 360 − α, alt = 0)', () => {
+  for (const a of [0, 30, 90, 180, 275]) {
+    const p = backCameraAzAlt(a, 90, 0);
+    near(p.azimuth, ((360 - a) % 360 + 360) % 360, 1e-6, `az at α=${a}`);
+    near(p.altitude, 0, 1e-6, `alt at α=${a}`);
+  }
+});
+
+test('backCameraAzAlt: pitch maps to altitude (β − 90 at zero roll)', () => {
+  near(backCameraAzAlt(0, 135, 0).altitude, 45, 1e-6, 'tilt up 45°');
+  near(backCameraAzAlt(0, 45, 0).altitude, -45, 1e-6, 'tilt down 45°');
+  near(backCameraAzAlt(0, 180, 0).altitude, 90, 1e-6, 'straight up = zenith');
+});
+
+test('backCameraAzAlt: NO azimuth flip when pitched past 45° (the v2.0.0 bug)', () => {
+  // The whole point: at zero roll, azimuth is invariant under pitch — a level
+  // phone and one tilted steeply up must report the SAME azimuth. The old model
+  // (compass-as-azimuth) flipped ~180° here.
+  for (const a of [0, 60, 150, 243]) {
+    const level = backCameraAzAlt(a, 90, 0).azimuth;
+    for (const beta of [110, 135, 160]) {
+      near(backCameraAzAlt(a, beta, 0).azimuth, level, 1e-6, `az stable α=${a} β=${beta}`);
+    }
+  }
+});
+
+test('backCameraAzAlt: roll about the top edge spins azimuth about vertical', () => {
+  // At β=90 the top edge points at the zenith, so γ rotates the phone about the
+  // world vertical → azimuth shifts by γ, altitude stays level.
+  const p = backCameraAzAlt(0, 90, 30);
+  near(p.azimuth, 330, 1e-6, 'γ=30 shifts az by 30');
+  near(p.altitude, 0, 1e-6, 'still level');
 });
 
 test('calibration offsets wrap the short way and invert cleanly', () => {
