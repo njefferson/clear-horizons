@@ -26,7 +26,11 @@ import { activeSite, saveSiteHorizon } from '../model/sites.js';
 import { makeHorizon, serializeHorizon } from '../model/horizon.js';
 import { makePin, destPoint, applyPinsToProfile, fetchElevations } from '../model/terrain.js';
 
-const TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+// services.arcgisonline.com is the CURRENT host for the classic keyless
+// imagery; the old server.arcgisonline.com REDIRECTS there, and CSP validates
+// every hop of a redirect — pointing at the final host avoids the hop (both
+// hosts stay allow-listed in _headers in case Esri flips the direction).
+const TILES = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const ATTRIB = 'Tiles © Esri — Esri, Maxar, Earthstar Geographics, and the GIS User Community';
 
 let tm = null; // view state: { site, siteElev, pins:[], map, L, markers:Map }
@@ -137,7 +141,15 @@ async function initMap(site) {
   if (!mounted() || !tm) return;
   tm.L = L;
   const map = L.map('tm-map', { zoomControl: true }).setView([site.lat, site.lon], 12);
-  L.tileLayer(TILES, { maxZoom: 17, attribution: ATTRIB }).addTo(map);
+  const tiles = L.tileLayer(TILES, { maxZoom: 17, attribution: ATTRIB }).addTo(map);
+  // A grey map must never be silent: say WHY once, instead of looking broken.
+  let tileFailSaid = false;
+  tiles.on('tileerror', () => {
+    if (tileFailSaid) return;
+    tileFailSaid = true;
+    say('Satellite imagery isn’t loading — check the connection. Pins still work from bearing + distance if elevations load.');
+  });
+  tiles.on('load', () => { tileFailSaid = false; });
   L.circleMarker([site.lat, site.lon], {
     radius: 7, color: '#0b0e17', weight: 2, fillColor: '#ffd166', fillOpacity: 1,
   }).addTo(map).bindTooltip(site.name);

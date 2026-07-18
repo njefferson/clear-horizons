@@ -98,7 +98,7 @@ await page.route(/alasky\.u-strasbg\.fr/, (r) => r.fulfill({ contentType: 'image
 // the site (Smoke Yard, 37.5/-122) sits at 100 m, everywhere else at 600 m.
 const PNG1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
-await page.route(/server\.arcgisonline\.com/, (r) => r.fulfill({ contentType: 'image/png', body: PNG1PX }));
+await page.route(/(server|services)\.arcgisonline\.com/, (r) => r.fulfill({ contentType: 'image/png', body: PNG1PX }));
 await page.route(/api\.open-meteo\.com\/v1\/elevation/, (r) => {
   const u = new URL(r.request().url());
   const lats = u.searchParams.get('latitude').split(',');

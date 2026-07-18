@@ -1,7 +1,7 @@
 // Horizon Planner service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v32'; // app v2.6.0 — map-pin terrain horizon (#/horizon/map): vendored Leaflet + Esri imagery + Open-Meteo elevation → ridge pins into the profile
+const CACHE = 'horizon-v33'; // app v2.6.1 — terrain-map tiles fixed: current Esri host (services.arcgisonline.com), CSP covers both hosts, tile failures announce
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',

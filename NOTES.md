@@ -481,6 +481,18 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.6.1 — 2026-07-18** (SW cache `horizon-v33`). **Terrain-map grey-tiles
+  fix** (device pass: "the map loads bare grey"). Root cause (most probable —
+  Esri is unreachable from the dev sandbox, stated honestly): the classic
+  `server.arcgisonline.com` tile host redirects to
+  `services.arcgisonline.com`, and **CSP validates every hop of a redirect** —
+  img-src allowed only the old host, so every tile died silently. Fix: tile
+  template now points at the current host directly (no hop), CSP img-src
+  allows BOTH hosts (in case Esri flips again), and — the systemic half — a
+  Leaflet `tileerror` handler announces tile failure via the status node, so
+  a grey map can never be silent again and any remaining failure names its
+  leg (library vs tiles vs elevation). 154 unit, 50 contrast, 23 smoke
+  (route mock covers both hosts), 0 axe (34 scans).
 - **v2.6.0 — 2026-07-18** (SW cache `horizon-v32`). **Map-pin terrain horizon**
   — the last named roadmap item. `#/horizon/map` from the editor's 🗺 Map…
   button: vendored Leaflet 1.9.4 (minified ESM + css in `src/vendor/`,
