@@ -52,7 +52,7 @@ everywhere, not just here.
   instruction, 2026-07-18). Keep the staging→main flow moving without prompting
   for release ceremony. Versioning: patch/minor bumps happen as part of
   iterating; **MAJOR versions are Noah's call** — he usually declares one, but
-  Claude *may recommend* a MAJ when warranted. Recorded next MAJ: the **AR
+  Claude *may recommend* a major when warranted. Recorded next major: the **AR
   "arcs across the sky" view** is v2.0.0 (a major bump when it lands). (This does
   NOT relax the repo-metadata "call it out and confirm" rule above — that stays.)
 - Before a release, the gates in NOTES' Verification section must pass:
