@@ -48,6 +48,13 @@ everywhere, not just here.
 - **Only `staging` and `main` exist, ever** (see NOTES). Work → `staging` →
   on-device pass → merge to `main`; cut a release by bumping `package.json`,
   promoting, and dispatching the **Tag release** workflow.
+- **Just iterate — do NOT ask about version bumps or releases** (owner's
+  instruction, 2026-07-18). Keep the staging→main flow moving without prompting
+  for release ceremony. Versioning: patch/minor bumps happen as part of
+  iterating; **MAJOR versions are Noah's call** — he usually declares one, but
+  Claude *may recommend* a MAJ when warranted. Recorded next MAJ: the **AR
+  "arcs across the sky" view** is v2.0.0 (a major bump when it lands). (This does
+  NOT relax the repo-metadata "call it out and confirm" rule above — that stays.)
 - Before a release, the gates in NOTES' Verification section must pass:
   `node --test`, `npm run test:contrast` (CI), `npm run test:ui`,
   `npm run test:a11y` (zero axe violations). Accessibility is a top priority —

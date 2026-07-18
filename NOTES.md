@@ -9,7 +9,8 @@ Photography-Studio): free, on-device, offline-first PWA on Cloudflare Pages.
 Noah is building this next: an augmented-reality / planetarium view that shows
 where each target sits in the sky and its ARC over the night, with an hour
 scrubber to step through the night and watch it move. This is "the last missing
-piece" the flat time-vs-altitude graph on Tonight can't show.
+piece" the flat time-vs-altitude graph on Tonight can't show. **This is the next
+MAJOR version — v2.0.0** (bump package.json accordingly when it lands).
 
 **Everything needed already exists — this is assembly, not new physics:**
 - `model/arproject.js` — world (az/alt) → screen projection AND the inverses,
