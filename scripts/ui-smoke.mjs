@@ -105,9 +105,12 @@ await page.route(/(server|services)\.arcgisonline\.com/, tilePng);
 await page.route(/tile\.opentopomap\.org/, tilePng);
 await page.route(/api\.open-meteo\.com\/v1\/elevation/, (r) => {
   const u = new URL(r.request().url());
-  const lats = u.searchParams.get('latitude').split(',');
-  const isSite = (lat, i) => lat === '37.50000' && u.searchParams.get('longitude').split(',')[i] === '-122.00000';
-  r.fulfill({ contentType: 'application/json', body: JSON.stringify({ elevation: lats.map((la, i) => (isSite(la, i) ? 100 : 600)) }) });
+  const lats = u.searchParams.get('latitude').split(',').map(Number);
+  // Synthetic terrain for the 360° trace: a 600 m plateau starting ~4.4 km
+  // south of the Smoke Yard site (lat < 37.46); 100 m everywhere else. The
+  // nearest qualifying ray sample (~4.5 km) subtends ≈6.3° — so a correct
+  // max-over-ray trace reports ~6° due south and ~0° due north.
+  r.fulfill({ contentType: 'application/json', body: JSON.stringify({ elevation: lats.map((la) => (la < 37.46 ? 600 : 100)) }) });
 });
 // Deterministic cloud forecast: fulfil the Open-Meteo forecast call with a
 // synthetic ramp spanning ±48 h of "now", so the Tonight cloud strip renders
@@ -217,40 +220,43 @@ await step('horizon editor: Stellarium import (keeps the file\'s density)', asyn
   ok(/tallest 20°/.test(max), `tallest after import: ${max}`);
 });
 
-await step('terrain map: keyboard pin computes az/alt from elevation; apply sets the wedge', async () => {
+await step('terrain: 360° trace applies the horizon; map tap creates a site', async () => {
   // Entered from the Horizon editor's Map… button; #/horizon/map must route
   // before #/horizon (the capture/live precedent).
-  await page.click('.hz-actions .btn:has-text("Map")');
+  await page.click('.hz-actions .btn:has-text("Terrain")');
   await page.waitForFunction(() => location.hash.startsWith('#/horizon/map'));
   await page.waitForSelector('.tm-map.leaflet-container'); // Leaflet classes the map div itself
   ok(/no trees/i.test(await page.$eval('.sky-notice', (e) => e.textContent)), 'tree caveat stated plainly');
   ok(/Esri/.test(await page.$eval('.leaflet-control-attribution', (e) => e.textContent)), 'Esri imagery attributed');
 
-  // The KEYBOARD path (the map is never the only way in): bearing 183°,
-  // distance 8 km → site elev 100 m, ridge 600 m ⇒ atan((498 − 4.4 m drop)/8000)
-  // ≈ 3.5°, landing on the 180° editor wedge.
-  await page.fill('.tm-form input[placeholder="183"]', '183');
-  await page.fill('.tm-form input[placeholder="8.0"]', '8');
-  await page.click('.tm-form .btn[type="submit"]');
-  await page.waitForFunction(() => /az 183°/.test(document.querySelector('.tm-pins')?.textContent || ''));
-  const row = await page.$eval('.tm-pins', (e) => e.textContent);
-  ok(/alt 3\.5° · 8\.0 km · elev 600 m/.test(row), `pin row computes: ${row}`);
-  ok(/Pin added/.test(await page.$eval('#tm-status', (e) => e.textContent)), 'add announced via role=status');
+  // The trace: max-over-ray against the synthetic south plateau. Near ground
+  // out-blocks distance — ~6.3° due south from the ~4.5 km sample, ~0° north.
+  await page.waitForFunction(() => /Site elevation/.test(document.querySelector('#tm-status')?.textContent || ''));
+  await page.click('#tm-trace');
+  await page.waitForFunction(() => /Terrain horizon applied/.test(document.querySelector('#tm-status')?.textContent || ''), null, { timeout: 20000 });
+  const summary = await page.$eval('#tm-summary', (e) => e.textContent);
+  ok(/Tallest terrain 6\.\d° at az 180°/.test(summary), `trace summary: ${summary}`);
+  ok((await page.$$('.leaflet-overlay-pane path')).length >= 1, 'horizon ring drawn on the map');
+  await shot('terrain-trace.png');
 
-  // Pointer path: a map click drops a pin too (elevation mocked to 600 m).
+  // Map tap → a NEW SITE (the map's remaining pointer job); non-pointer site
+  // entry lives on the Sites tab, so this is never the only way in.
   await page.click('.tm-map', { position: { x: 60, y: 60 } });
-  await page.waitForFunction(() => document.querySelectorAll('.tm-pins .tm-pin').length === 2);
-  // Remove the map pin (its distance is viewport-dependent) — keep it deterministic.
-  await page.click('.tm-pins .tm-pin:nth-child(2) .btn');
-  await page.waitForFunction(() => document.querySelectorAll('.tm-pins .tm-pin').length === 1);
+  await page.waitForSelector('.loc-dialog');
+  await page.fill('.loc-dialog input', 'Ridge Spot');
+  await page.click('.loc-dialog .btn.primary');
+  await page.waitForFunction(() => /Ridge Spot/.test(document.querySelector('.ng-site')?.textContent || ''));
+  ok(true, 'tapped spot became the active site');
 
-  await shot('terrain-map.png');
-  await page.click('#tm-apply');
-  await page.waitForSelector('.hz-svg'); // lands back on the editor
-  // The 183° pin replaced the imported 180°→20° point with 3.5°; the imported
-  // 0°→12° point is now the tallest — the wedge semantics, visible.
+  // Restore Smoke Yard as active, then confirm the editor carries the trace.
+  await page.evaluate(() => { location.hash = '#/sites'; });
+  await page.waitForSelector('.site-row');
+  await page.click('.site-row:has-text("Smoke Yard") button');
+  await page.waitForSelector('.site-row.active:has-text("Smoke Yard")');
+  await page.evaluate(() => { location.hash = '#/horizon'; });
+  await page.waitForSelector('.hz-svg');
   const max = await page.$eval('.hz-max', (e) => e.textContent);
-  ok(/tallest 12°/.test(max), `pin replaced its wedge (tallest now: ${max})`);
+  ok(/tallest 6°/.test(max), `traced terrain landed in the editor (${max})`);
 });
 
 await step('terrain map: Esri outage falls back to OpenTopoMap, announced', async () => {

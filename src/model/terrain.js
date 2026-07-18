@@ -90,6 +90,56 @@ export function applyPinsToProfile(profile, pins) {
   return profile;
 }
 
+// --- automatic terrain-horizon trace -----------------------------------------
+// A pin measures ONE point's angle; the horizon at a bearing is the MAXIMUM
+// angle over EVERY point along the ray — nearer ground can out-block a distant
+// ridge (device-pass insight, 2026-07-18). So the trace sweeps all 360°:
+// per 10° ray, sample elevations at log-spaced distances (dense near, sparse
+// far), take the max apparent altitude, and note WHERE it came from (the
+// argmax point draws the "horizon ring" on the map).
+export const TRACE = { azStep: 10, minDist_m: 150, maxDist_m: 40000, samplesPerRay: 24 };
+
+/** All sample points of a full trace: rays × log-spaced distances. */
+export function traceSamplePoints(site, T = TRACE) {
+  const pts = [];
+  const growth = Math.log(T.maxDist_m / T.minDist_m);
+  for (let az = 0; az < 360; az += T.azStep) {
+    for (let i = 0; i < T.samplesPerRay; i++) {
+      const dist_m = T.minDist_m * Math.exp(growth * (i / (T.samplesPerRay - 1)));
+      const p = destPoint(site, az, dist_m);
+      pts.push({ az, dist_m, lat: p.lat, lon: p.lon });
+    }
+  }
+  return pts;
+}
+
+/**
+ * Trace the full terrain horizon: per azimuth, the max apparent altitude along
+ * the ray, with the blocking point's location. Batches the elevation API 100
+ * coords at a time (one retry per batch, then fails closed). `onProgress`
+ * (0..1) is for a silent visual meter — announce start/done, not every tick.
+ * @returns { points: [{ az, alt, dist_m, lat, lon, elev_m }, …] } 36 rays.
+ */
+export async function traceHorizon(site, siteElev_m, { fetchFn, onProgress, T = TRACE } = {}) {
+  const samples = traceSamplePoints(site, T);
+  const elevs = new Array(samples.length);
+  for (let i = 0; i < samples.length; i += 100) {
+    const chunk = samples.slice(i, i + 100);
+    let got;
+    try { got = await fetchElevations(chunk, fetchFn); }
+    catch { got = await fetchElevations(chunk, fetchFn); } // one retry, then throw
+    for (let j = 0; j < got.length; j++) elevs[i + j] = got[j];
+    if (onProgress) onProgress(Math.min(1, (i + 100) / samples.length));
+  }
+  const best = new Map(); // az → sample with max apparent altitude
+  samples.forEach((s, i) => {
+    const alt = pinAltitudeDeg(siteElev_m, elevs[i], s.dist_m);
+    const cur = best.get(s.az);
+    if (!cur || alt > cur.alt) best.set(s.az, { az: s.az, alt, dist_m: s.dist_m, lat: s.lat, lon: s.lon, elev_m: elevs[i] });
+  });
+  return { points: [...best.values()].sort((a, b) => a.az - b.az) };
+}
+
 /**
  * Ground elevations (m) for up to 100 points via Open-Meteo's keyless
  * elevation API. Fails closed (throws) — callers surface a plain message.

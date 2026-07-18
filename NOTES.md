@@ -9,10 +9,16 @@ Photography-Studio): free, on-device, offline-first PWA on Cloudflare Pages.
 The AR sky view that used to headline this block SHIPPED as v2.0.0; weather
 shipped as v2.1.0/v2.2.0; the polar "point to the pole" live aid as v2.3.0.
 What's next, in rough order:
-- **The planned roadmap is fully shipped as of v2.6.0** (map-pin terrain
-  horizon was the last named item). What remains are the stretch capture
-  ideas: auto-trace sky segmentation, the panorama export, per-device FOV
-  calibration — plus whatever the next device pass surfaces.
+- **Panoramic/landscape EXPORT is now the headline ask** (Noah, 2026-07-18
+  device pass): spin in a circle and record an image — panoramic, 3D,
+  "I don't care what format" — that exports together with the horizon data
+  into **Stellarium and other software**. "Being able to use that data in
+  other tools … is ultimately the whole point." Stellarium horizon-LIST
+  export already ships; the missing piece is the stitched landscape IMAGE
+  (Stellarium landscape package = image + horizon). Builds on the live
+  camera capture stack.
+- Remaining stretch capture ideas: auto-trace sky segmentation, per-device
+  FOV calibration — plus whatever the next device pass surfaces.
 - Device pass through v2.3.0 (incl. the polar-aim lock feel) **done — Noah,
   2026-07-18**. Repo metadata (About fields + v2.0.2 social preview) confirmed
   done the same day — the CLAUDE.md ritual is satisfied for this art rev.
@@ -301,9 +307,12 @@ next capture iteration:
   time as you set each azimuth — you see the profile take shape on the sky.
 - **Auto-trace (stretch)**: sky-vs-not-sky segmentation logs the skyline as you
   turn — no manual reticle.
-- **Perfect (stretch)**: capture a stitched **horizon panorama image** exported
-  alongside the az/alt data, importable into other tools (Stellarium landscape,
-  etc.).
+- **Panorama export — PROMOTED from stretch to the headline ask (Noah,
+  2026-07-18)**: spin in a circle, record a panoramic/3D image, export it
+  WITH the horizon data for Stellarium landscapes and other software —
+  "being able to use that data in other tools … is ultimately the whole
+  point." (Format is open: equirectangular strip is the natural fit for a
+  Stellarium `spherical` landscape.)
 Keep the current sensor path as the no-camera fallback. Device-only,
 NEEDS-HIS-HANDS. Accessibility note (standing order): the reticle needs a
 keyboard/manual-entry equivalent, and the AR bar-graph carries a text/numeric
@@ -422,14 +431,18 @@ tools:**
   cutouts (list + detail) precache into the stable `horizon-thumbs-v1` Cache-API
   cache (`model/precache.js`) and survive SW version bumps — offline in the
   field shows real imagery; never-warmed objects keep the honest placeholder.*
-- **Map-pin terrain horizon** — SHIPPED v2.6.0 (Noah's "10° in 360°" idea):
-  `#/horizon/map` (from the editor's Map… button) — vendored Leaflet + keyless
-  Esri World Imagery (NOT Google Maps: API key + billing) + Open-Meteo's
-  keyless elevation API. Tap a ridge (or the bearing+distance keyboard form) →
-  `model/terrain.js` computes az/alt with earth-curvature + refraction; Apply
-  writes each pin into its 10° wedge via `setAltitudeAt` — same semantics as a
-  hand-dragged handle. The **no-trees caveat is stated in the UI** ("measure
-  with the camera instead") — pins model distant ridgelines only.
+- **Terrain horizon** — SHIPPED v2.6.0 as map-PINS, then **re-envisioned
+  v2.7.0 after Noah's device-pass insight**: a pin measures ONE point's angle,
+  but the horizon at a bearing is the MAX over every point along the ray —
+  near ground can out-block a pinned ridge. So the app now **ray-traces all
+  360° automatically** (`traceHorizon`: 36 rays × 24 log-spaced elevation
+  samples out to 40 km, max-over-ray with curvature+refraction) and applies
+  the result in one tap with Undo; the traced "horizon ring" (each ray's
+  blocking point) draws on the map. Pins are retired; the map's remaining
+  pointer job is **creating sites by tap** (starts at zoom 14). Stack:
+  vendored Leaflet + keyless Esri imagery with OpenTopoMap auto-fallback
+  (NOT Google Maps: API key + billing) + Open-Meteo elevation. The
+  **no-trees caveat is stated in the UI** — terrain ridgelines only.
 - **Sky-segmentation capture (v2 stretch)** — daylight panned-video skyline
   threshold → alt/az. Hard parts: per-phone FOV calibration, compass drift.
 
@@ -481,6 +494,26 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.7.0 — 2026-07-18** (SW cache `horizon-v36`). **Automatic 360°
+  terrain-horizon trace** — Noah's device-pass insight retired the pin model:
+  a pin measures one point's angle, but the horizon at a bearing is the MAX
+  over every point along the ray (near ground out-blocks a far ridge). New
+  `traceHorizon` (`model/terrain.js`): 36 rays × 24 log-spaced samples
+  (150 m → 40 km, dense near), batched elevation calls (~9, one retry each,
+  fail-closed), max-over-ray with curvature+refraction; unit-tested incl.
+  the near-hill-beats-far-ridge case the pin model got wrong. The Terrain
+  view is one primary action: Trace → applies to the site (Undo toast
+  restores the prior profile byte-identically) → summary line + the traced
+  **horizon ring** drawn on the map (each ray's blocking point — you see
+  WHERE your horizon comes from). Map tap now **creates a site** (name
+  dialog → active; Sites tab remains the non-pointer path); starts at
+  zoom 14. Progress is a silent visual meter; only start/done/fail announce.
+  Editor button renamed 🗺 Terrain…. Two Leaflet teardown crashes fixed
+  (rerender inside its click stack; animated fitBounds outliving the view).
+  157 unit, 50 contrast, 24 smoke (synthetic south-plateau terrain → editor
+  shows the traced 6°; site-created-by-tap round-trip), 0 axe (34 scans).
+  NEEDS-HIS-HANDS: trace the real yard and sanity-check against the camera
+  capture + known ridges.
 - **v2.6.3 — 2026-07-18** (SW cache `horizon-v35`). **Terrain tiles, third
   pass — take the service worker out of the tile path.** Noah's screenshot of
   "tiny black lines" on the grey map was the tell: fragments of tiles WERE

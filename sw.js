@@ -1,7 +1,7 @@
 // Horizon Planner service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v35'; // app v2.6.3 — map tiles bypass the SW (iOS opaque-piping breakage); late tiles correct a premature failure message
+const CACHE = 'horizon-v36'; // app v2.7.0 — automatic 360° terrain-horizon ray-trace (pins retired); map tap creates sites; zoom 14 start
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',

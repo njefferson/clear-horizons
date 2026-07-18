@@ -1,37 +1,29 @@
 // =============================================================================
-// terrainmap.js (UI) — the map-pin TERRAIN horizon (#/horizon/map), entered
-// from the Horizon editor. Drop pins on distant ridges on a keyless satellite
-// map (vendored Leaflet + free Esri World Imagery — no API key, no billing);
-// each pin's (azimuth, altitude) from the active site is computed from
-// geodesy + the Open-Meteo elevation model (model/terrain.js), listed in
-// text, and applied to the SAME horizon profile as a hand-dragged handle.
+// terrainmap.js (UI) — the TERRAIN view (#/horizon/map), reworked after the
+// 2026-07-18 device pass. Noah's insight killed the pin model: a pin measures
+// ONE point's angle, but the horizon at a bearing is the MAX over EVERY point
+// along the ray — so the app now ray-traces all 360° itself (model/terrain.js
+// traceHorizon) and applies the result in one tap, with an Undo. The traced
+// "horizon ring" (each ray's blocking point) draws on the map so you can SEE
+// where your horizon comes from.
 //
-// HONESTY (per NOTES, stated in the UI): elevation data has NO TREES — pins
-// model distant ridgelines only; a tree-ringed yard needs the camera capture.
+// The map's remaining pointer job is CREATING SITES: tap a spot → name it →
+// it becomes the active site (scouting flow). The non-pointer equivalent is
+// the Sites tab's manual/geolocation/search entry, so the map is never the
+// only way in; the trace itself is a plain button.
 //
-// ACCESSIBILITY. The map is pointer-first, so it is never the only way in:
-// the "add by bearing + distance" form is the full keyboard path to the same
-// pin math, every pin is a text row with a Remove button, and add/remove/
-// apply announce via one role=status node. The map container itself is
-// role=application with a label pointing at the form alternative.
+// HONESTY (per NOTES, stated in the UI): elevation data has NO TREES — the
+// trace models terrain ridgelines only; a tree-ringed yard needs the camera.
 //
-// OFFLINE. Tiles and elevations are network features: tile failures leave a
-// grey map, elevation failures announce plainly and add nothing. The saved
-// horizon is only touched by an explicit Apply. Leaflet (vendored ESM +
-// stylesheet) is dynamic-imported on first open so app boot stays light;
-// both files are SW-precached, so the view itself loads offline.
+// Tile sources are keyless with automatic fallback (Esri imagery →
+// OpenTopoMap), a dedicated un-clobberable tile-status line, and the SW
+// BYPASSES tile hosts entirely (iOS opaque-piping breakage — see sw.js).
 // =============================================================================
 import { el, clear, toast } from './dom.js';
-import { activeSite, saveSiteHorizon } from '../model/sites.js';
-import { makeHorizon, serializeHorizon } from '../model/horizon.js';
-import { makePin, destPoint, applyPinsToProfile, fetchElevations } from '../model/terrain.js';
+import { activeSite, addSite, setActiveSite, saveSiteHorizon } from '../model/sites.js';
+import { makeHorizon, serializeHorizon, maxAltitude } from '../model/horizon.js';
+import { traceHorizon, fetchElevations } from '../model/terrain.js';
 
-// Tile sources, in preference order, all keyless. Esri's classic imagery
-// endpoint is deprecated ("mature") and failed on a real device (2026-07-18
-// pass) even on the current host, so the view no longer bets on one provider:
-// after repeated tile errors with zero successes it swaps to the next source
-// and says so. OpenTopoMap (OSM + SRTM contours) is arguably the BETTER map
-// for picking ridgelines anyway — contour lines name the ridge heights.
 const SOURCES = [
   {
     name: 'Esri satellite imagery',
@@ -47,8 +39,9 @@ const SOURCES = [
   },
 ];
 const FALLBACK_AFTER = 3; // consecutive tile errors (with no success) before swapping
+const START_ZOOM = 14;    // close-in: you're locating YOUR yard, not a region (device ask)
 
-let tm = null; // view state: { site, siteElev, pins:[], map, L, markers:Map }
+let tm = null; // { site, siteElev, map, L, ring, tracing }
 let root = null;
 const mounted = () => root && root.isConnected;
 
@@ -61,95 +54,65 @@ export async function renderTerrainMap(app, state, nav) {
       el('h1', {}, 'Terrain horizon'),
       el('div.dead-end', {}, [
         el('h2', {}, 'No site yet'),
-        el('p', {}, 'Terrain pins are measured from a site’s coordinates. Add one first.'),
+        el('p', {}, 'The terrain trace runs from a site’s coordinates. Add one first.'),
         el('div.card-actions', {}, [el('button.btn.primary', { onclick: () => nav.go('#/sites') }, 'Go to Sites')]),
       ]));
     return;
   }
 
-  tm = { site, siteElev: null, pins: [], map: null, L: null, markers: new Map() };
+  tm = { site, siteElev: null, map: null, L: null, ring: null, tracing: false };
   buildShell(app, site, nav);
   window.addEventListener('hashchange', onHashLeave);
-  await initMap(site);
+  await initMap(site, nav);
   await initSiteElevation(site);
 }
 
 // --- shell -------------------------------------------------------------------
 function buildShell(app, site, nav) {
   root = el('div.tm-root');
+  const label = site.name || `${site.lat.toFixed(2)}, ${site.lon.toFixed(2)}`;
 
   const head = el('div.pa-head', {}, [
     el('h1', {}, 'Terrain horizon'),
     el('div.row-actions', {}, [
-      el('button.chip.ng-site', { onclick: () => { stopTerrainMap(); nav.go('#/sites'); }, 'aria-label': `Site: ${site.name} — change` },
-        [el('span', { 'aria-hidden': 'true' }, `📍 ${site.name}`)]),
+      el('button.chip.ng-site', { onclick: () => { stopTerrainMap(); nav.go('#/sites'); }, 'aria-label': `Site: ${label} — change` },
+        [el('span', { 'aria-hidden': 'true' }, `📍 ${label}`)]),
       el('button.btn.small', { onclick: () => { stopTerrainMap(); nav.go('#/horizon'); } }, '← Horizon'),
     ]),
   ]);
 
-  // The baked-in caveat — always visible, never fine print.
   const caveat = el('div.sky-notice', {}, [
-    el('span', {}, '🌲 Elevation data has no trees — pins estimate distant ridgelines only. For a tree-ringed yard, '),
+    el('span', {}, '🌲 Elevation data has no trees — the trace models terrain ridgelines only. For a tree-ringed yard, '),
     el('button.linklike', { onclick: () => { stopTerrainMap(); nav.go('#/capture/live'); } }, 'measure with the camera'),
     el('span', {}, ' instead.'),
   ]);
 
   const mapBox = el('div.tm-map', {
     id: 'tm-map', role: 'application',
-    'aria-label': 'Terrain map. Tap a distant ridge to drop a terrain pin. Keyboard users: the bearing and distance form below adds the same pins without the map.',
+    'aria-label': 'Terrain map centred on your site. Tap a spot to create a new site there. The trace button below computes the horizon without the map.',
   });
-  // Tile problems get their own persistent line — never shared with (or
-  // overwritten by) the pin/elevation status below the pins list.
   const tileStatus = el('p.dim.small', { id: 'tm-tiles', role: 'status', 'aria-live': 'polite' }, '');
 
-  // The keyboard path — the same pin math with no pointer.
-  const brg = el('input.loc-in', { type: 'number', min: '0', max: '359.9', step: '0.1', placeholder: '183' });
-  const dist = el('input.loc-in', { type: 'number', min: '0.05', max: '80', step: '0.05', placeholder: '8.0' });
-  const form = el('form.tm-form', {
-    onsubmit: (e) => {
-      e.preventDefault();
-      const b = parseFloat(brg.value), d = parseFloat(dist.value);
-      if (!(b >= 0 && b < 360) || !(d > 0)) { say('Enter a bearing 0–359° and a distance in km.'); return; }
-      addPinAt(destPoint(tm.site, b, d * 1000));
-    },
-  }, [
-    el('span.dim.small', {}, 'Add without the map:'),
-    labeled('Bearing (° true)', brg),
-    labeled('Distance (km)', dist),
-    el('button.btn.small', { type: 'submit' }, '+ Add pin'),
-  ]);
-
-  const list = el('ul.tm-pins', { id: 'tm-pins' });
+  // The headline action: ray-trace all 360° and apply, with an Undo toast.
+  const traceBtn = el('button.btn.primary', { id: 'tm-trace', onclick: () => runTrace(nav) },
+    '⛰ Trace terrain horizon (360°)');
+  // Progress meter is a SILENT visual (updated per batch); only start/done/
+  // fail announce via the live status node — a stream is not an announcement.
+  const progress = el('p.dim.small.mono', { id: 'tm-progress' }, '');
   const statusNode = el('p.dim.small', { id: 'tm-status', role: 'status', 'aria-live': 'polite' }, '');
-
-  const apply = el('button.btn.primary', {
-    id: 'tm-apply', disabled: true,
-    onclick: () => {
-      if (!tm.pins.length) return;
-      const profile = makeHorizon(tm.site.horizon);
-      applyPinsToProfile(profile, tm.pins);
-      saveSiteHorizon(tm.site.id, serializeHorizon(profile));
-      toast(`${tm.pins.length} terrain pin${tm.pins.length === 1 ? '' : 's'} applied to ${tm.site.name}.`);
-      stopTerrainMap();
-      nav.go('#/horizon'); // land on the editor so the new wedges are visible
-    },
-  }, 'Apply pins to horizon');
+  const summary = el('p.tm-summary.mono', { id: 'tm-summary' }, '');
 
   root.append(
-    head, caveat, mapBox, tileStatus, form,
-    el('section.tm-listwrap', {}, [el('h2.tm-listhead', {}, 'Pins'), list, statusNode]),
-    el('div.card-actions', {}, [apply]),
-    el('p.settings-foot', {}, 'Each pin sets its 10° wedge of the horizon — the same as dragging that editor handle. Altitudes include earth curvature and standard refraction. Nothing is saved until you Apply.'),
+    head, caveat, mapBox, tileStatus,
+    el('div.card-actions', {}, [traceBtn]),
+    progress, summary, statusNode,
+    el('p.settings-foot', {}, 'The trace samples elevations along 36 rays (dense nearby, out to 40 km), keeps each ray’s HIGHEST apparent point — near ground can out-block a distant ridge — and applies the result to this site’s horizon (Undo in the toast). Tap the map to start a new site somewhere else.'),
   );
   app.append(root);
-  renderPins();
 }
 
-function labeled(label, control) { return el('label.fld', {}, [el('span', {}, label), control]); }
-
 // --- map ---------------------------------------------------------------------
-async function initMap(site) {
-  // Stylesheet + library load lazily on first open (both SW-precached).
+async function initMap(site, nav) {
   if (!document.querySelector('link[href$="vendor/leaflet.css"]')) {
     document.head.append(el('link', { rel: 'stylesheet', href: './src/vendor/leaflet.css' }));
   }
@@ -158,19 +121,15 @@ async function initMap(site) {
   catch { say('The map library could not load.'); return; }
   if (!mounted() || !tm) return;
   tm.L = L;
-  const map = L.map('tm-map', { zoomControl: true }).setView([site.lat, site.lon], 12);
+  const map = L.map('tm-map', { zoomControl: true }).setView([site.lat, site.lon], START_ZOOM);
   addTileSource(map, L, 0);
   L.circleMarker([site.lat, site.lon], {
     radius: 7, color: '#0b0e17', weight: 2, fillColor: '#ffd166', fillOpacity: 1,
   }).addTo(map).bindTooltip(site.name);
-  map.on('click', (e) => addPinAt({ lat: e.latlng.lat, lon: e.latlng.lng }));
+  map.on('click', (e) => openNewSiteDialog({ lat: e.latlng.lat, lon: e.latlng.lng }, nav));
   tm.map = map;
 }
 
-// Add tile source `idx`; on FALLBACK_AFTER errors with zero successful tiles,
-// swap to the next source and announce it. Tile status lives in its OWN line
-// (#tm-tiles) so pin/elevation messages can never overwrite it — the lesson
-// of the v2.6.1 diagnostic, which the elevation message clobbered.
 function addTileSource(map, L, idx) {
   const s = SOURCES[idx];
   let errors = 0, anyLoaded = false, swapped = false, deadSaid = false;
@@ -178,10 +137,8 @@ function addTileSource(map, L, idx) {
   layer.on('tileload', () => {
     if (anyLoaded) return;
     anyLoaded = true;
-    // Late-arriving tiles must CORRECT a premature failure message (rate
-    // limiters error a few tiles, then serve — the 2026-07-18 device pass).
-    // Otherwise: primary success clears the line; after a swap the
-    // "switched to …" note stays, so a topo map never looks unexplained.
+    // Late tiles must CORRECT a premature failure verdict (rate limiters
+    // error a few tiles, then serve); after a swap the "switched" note stays.
     if (deadSaid) tileSay(idx > 0 ? `${SOURCES[idx - 1].name} isn’t loading — switched to ${s.name}.` : '');
     else if (idx === 0) tileSay('');
   });
@@ -196,74 +153,114 @@ function addTileSource(map, L, idx) {
       addTileSource(map, L, idx + 1);
     } else if (!deadSaid) {
       deadSaid = true;
-      tileSay('No map tiles are loading — imagery may be blocked on this network. The bearing + distance form still works.');
+      tileSay('No map tiles are loading — imagery may be blocked on this network. The trace works without tiles.');
     }
   });
 }
 function tileSay(msg) { const n = root && root.querySelector('#tm-tiles'); if (n) n.textContent = msg; }
 
-// The site's ground elevation anchors every pin altitude. The elevation MODEL
-// value (not site.elevation_m, which is often 0/unknown) keeps site and pins
-// on the same reference surface.
+// Site + trace share one reference surface: the elevation MODEL's value for
+// the site (not site.elevation_m, often 0/unknown).
 async function initSiteElevation(site) {
   try {
     const [e] = await fetchElevations([{ lat: site.lat, lon: site.lon }]);
     if (!tm) return;
     tm.siteElev = e;
-    say(`Site elevation ${Math.round(e)} m. Tap a ridge to add a pin.`);
+    say(`Site elevation ${Math.round(e)} m. Trace to compute the terrain horizon.`);
   } catch {
     if (!tm) return;
-    say('Elevation lookup needs a connection — pins can’t be computed offline.');
+    say('Elevation lookup needs a connection — the trace can’t run offline.');
   }
 }
 
-// --- pins --------------------------------------------------------------------
-async function addPinAt(point) {
+// --- the trace ---------------------------------------------------------------
+async function runTrace(nav) {
+  if (!tm || tm.tracing) return;
+  if (tm.siteElev == null) { await initSiteElevation(tm.site); if (!tm || tm.siteElev == null) return; }
+  tm.tracing = true;
+  const btn = root.querySelector('#tm-trace');
+  if (btn) btn.disabled = true;
+  say('Tracing the terrain horizon — 36 directions out to 40 km…');
+  setProgress(0);
+  try {
+    const site = tm.site;
+    const traced = await traceHorizon(site, tm.siteElev, { onProgress: setProgress });
+    if (!tm || !mounted()) return;
+
+    // Apply as the site's horizon (the automatic draw Noah asked for), with a
+    // real Undo — the previous profile restores byte-identically.
+    const before = serializeHorizon(makeHorizon(site.horizon));
+    const profile = makeHorizon({ points: traced.points.map((p) => ({ az: p.az, alt: p.alt })) });
+    saveSiteHorizon(site.id, serializeHorizon(profile));
+    tm.site = activeSite(); // re-read: keep the in-view copy current
+
+    drawRing(traced.points);
+    const top = traced.points.reduce((a, b) => (b.alt > a.alt ? b : a));
+    const summary = root.querySelector('#tm-summary');
+    if (summary) {
+      summary.textContent = `Tallest terrain ${top.alt.toFixed(1)}° at az ${top.az}° (${(top.dist_m / 1000).toFixed(1)} km, ${Math.round(top.elev_m)} m) · profile max ${maxAltitude(profile).toFixed(1)}°`;
+    }
+    say('Terrain horizon applied to this site.');
+    toast(`Terrain horizon applied to ${site.name}.`, {
+      action: { label: 'Undo', onClick: () => { saveSiteHorizon(site.id, before); say('Terrain horizon undone — previous profile restored.'); } },
+    });
+  } catch {
+    say('The trace failed part-way — elevation service unreachable. Nothing was changed; try again when online.');
+  } finally {
+    setProgress(null);
+    if (tm) tm.tracing = false;
+    const b = root && root.querySelector('#tm-trace');
+    if (b) b.disabled = false;
+  }
+}
+
+function setProgress(frac) {
+  const n = root && root.querySelector('#tm-progress');
+  if (!n) return;
+  n.textContent = frac == null ? '' : `sampling elevations ${Math.round(frac * 100)}%`;
+}
+
+// The horizon ring: each ray's blocking point, joined — you can SEE where the
+// horizon comes from. Decorative (the summary + editor carry the data).
+function drawRing(points) {
+  if (!tm || !tm.map || !tm.L) return;
+  if (tm.ring) tm.map.removeLayer(tm.ring);
+  const latlngs = points.map((p) => [p.lat, p.lon]);
+  const casing = tm.L.polygon(latlngs, { color: '#0b0e17', weight: 4, opacity: 0.55, fill: false });
+  const line = tm.L.polygon(latlngs, { color: '#ffd166', weight: 2, opacity: 0.95, fill: false });
+  tm.ring = tm.L.layerGroup([casing, line]).addTo(tm.map);
+  // animate:false — an in-flight zoom animation outliving a fast navigation
+  // away is the other classic _leaflet_pos crash.
+  tm.map.fitBounds(line.getBounds(), { padding: [20, 20], animate: false });
+}
+
+// --- new site from a map tap -------------------------------------------------
+function openNewSiteDialog(point, nav) {
   if (!tm) return;
-  if (tm.siteElev == null) { await initSiteElevation(tm.site); if (tm.siteElev == null) return; }
-  let elev;
-  try { [elev] = await fetchElevations([point]); }
-  catch { say('Elevation lookup failed — check the connection and try again.'); return; }
-  if (!tm || !mounted()) return;
-  const pin = makePin(tm.site, tm.siteElev, point, elev);
-  tm.pins.push(pin);
-  if (tm.map && tm.L) {
-    const m = tm.L.circleMarker([pin.lat, pin.lon], {
-      radius: 6, color: '#0b0e17', weight: 2, fillColor: '#fff', fillOpacity: 1,
-    }).addTo(tm.map).bindTooltip(pinLabel(pin));
-    tm.markers.set(pin, m);
-  }
-  renderPins();
-  say(`Pin added: ${pinLabel(pin)}.`);
-}
-
-function removePin(pin) {
-  if (!tm) return;
-  tm.pins = tm.pins.filter((p) => p !== pin);
-  const m = tm.markers.get(pin);
-  if (m && tm.map) tm.map.removeLayer(m);
-  tm.markers.delete(pin);
-  renderPins();
-  say('Pin removed.');
-}
-
-function pinLabel(p) {
-  return `az ${p.az.toFixed(0)}° · alt ${p.alt.toFixed(1)}° · ${(p.dist_m / 1000).toFixed(1)} km · elev ${Math.round(p.elev_m)} m`;
-}
-
-function renderPins() {
-  const ul = root && root.querySelector('#tm-pins');
-  const apply = root && root.querySelector('#tm-apply');
-  if (!ul) return;
-  if (!tm.pins.length) {
-    ul.replaceChildren(el('li.tm-pin.dim.small', {}, 'No pins yet — tap a distant ridge on the map, or use the bearing form.'));
-  } else {
-    ul.replaceChildren(...tm.pins.map((p) => el('li.tm-pin', {}, [
-      el('span.mono', {}, pinLabel(p)),
-      el('button.btn.small', { onclick: () => removePin(p), 'aria-label': `Remove pin at azimuth ${p.az.toFixed(0)} degrees` }, 'Remove'),
-    ])));
-  }
-  if (apply) apply.disabled = !tm.pins.length;
+  document.querySelector('.loc-dialog')?.remove();
+  const name = el('input.loc-in', { type: 'text', placeholder: 'e.g. Ridge Spot' });
+  const dlg = el('dialog.loc-dialog', { 'aria-labelledby': 'tm-newsite-title' }, [
+    el('h2', { id: 'tm-newsite-title' }, 'New site here?'),
+    el('p.dim.small.mono', {}, `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}`),
+    el('div.loc-grid', {}, [el('label.fld', {}, [el('span', {}, 'Name'), name])]),
+    el('div.hz-dialog-foot', {}, [
+      el('button.btn.ghost', { onclick: () => dlg.close() }, 'Cancel'),
+      el('button.btn.primary', { onclick: () => {
+        const s = addSite({ name: name.value.trim() || 'Map pin site', lat: point.lat, lon: point.lon });
+        setActiveSite(s.id);
+        dlg.close();
+        toast(`“${s.name}” created and active.`);
+        // Defer past Leaflet's click-event stack: rerender tears the map down,
+        // and removing a map while it's still dispatching this event crashes
+        // its positioning code (_leaflet_pos).
+        setTimeout(() => nav.rerender(), 0);
+      } }, 'Create & switch'),
+    ]),
+  ]);
+  document.body.append(dlg);
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+  dlg.showModal();
 }
 
 function say(msg) { const n = root && root.querySelector('#tm-status'); if (n) n.textContent = msg; }

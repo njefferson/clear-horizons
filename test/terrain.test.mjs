@@ -9,7 +9,8 @@ globalThis.localStorage = (() => {
 
 const {
   bearingDistance, destPoint, pinAltitudeDeg, makePin, applyPinsToProfile,
-  fetchElevations, EARTH_R, REFRACTION_K, EYE_M,
+  fetchElevations, traceSamplePoints, traceHorizon, TRACE,
+  EARTH_R, REFRACTION_K, EYE_M,
 } = await import('../src/model/terrain.js');
 const { makeHorizon, sampleAt } = await import('../src/model/horizon.js');
 
@@ -73,6 +74,62 @@ test('applyPinsToProfile: each pin claims its 10° wedge, like a hand drag', () 
   near(sampleAt(profile, 90), 4.2, 0.01, '92° → 90° bin');
   near(sampleAt(profile, 270), -3, 0.01, 'below-level terrain records negative (hilltop sees extra sky)');
   near(sampleAt(profile, 0), 0, 0.01, 'unpinned directions untouched');
+});
+
+// A fake elevation fetch backed by a synthetic terrain function of (lat, lon).
+function terrainFetch(elevOf) {
+  return async (url) => {
+    const u = new URL(url);
+    const lats = u.searchParams.get('latitude').split(',').map(Number);
+    const lons = u.searchParams.get('longitude').split(',').map(Number);
+    return { ok: true, json: async () => ({ elevation: lats.map((la, i) => elevOf(la, lons[i])) }) };
+  };
+}
+
+const SITE = { lat: 37.5, lon: -122 };
+
+test('traceSamplePoints: 36 rays, log-spaced dense-near sparse-far', () => {
+  const pts = traceSamplePoints(SITE);
+  assert.equal(pts.length, (360 / TRACE.azStep) * TRACE.samplesPerRay);
+  const ray0 = pts.filter((p) => p.az === 0).map((p) => p.dist_m);
+  near(ray0[0], TRACE.minDist_m, 1, 'first sample at minDist');
+  near(ray0[ray0.length - 1], TRACE.maxDist_m, 1, 'last sample at maxDist');
+  const early = ray0[1] - ray0[0], late = ray0[ray0.length - 1] - ray0[ray0.length - 2];
+  assert.ok(late > early * 20, `log spacing: near step ${early} m, far step ${late} m`);
+});
+
+test('traceHorizon: a ray takes its MAX — near ground out-blocks a far ridge', async () => {
+  // Flat 100 m everywhere; due south a 300 m hill from 2 km out AND an 800 m
+  // ridge wall beyond 30 km. The hill subtends ~5.7°, the far ridge only
+  // ~1.2° — the trace must report the HILL (the pin-model bug this replaces).
+  const elevOf = (lat) => {
+    const southKm = (SITE.lat - lat) * 111.195;
+    if (southKm > 30) return 800;
+    if (southKm > 2) return 300;
+    return 100;
+  };
+  const t = await traceHorizon(SITE, 100, { fetchFn: terrainFetch(elevOf) });
+  assert.equal(t.points.length, 36);
+  const south = t.points.find((p) => p.az === 180);
+  assert.ok(south.alt > 4 && south.alt < 6, `south alt ${south.alt} — the near hill, not the far ridge`);
+  assert.ok(south.dist_m < 4000, `blocking point is the near hill (${south.dist_m} m)`);
+  const north = t.points.find((p) => p.az === 0);
+  assert.ok(Math.abs(north.alt) < 0.25, `flat north ~level (${north.alt})`);
+  // The argmax carries its location for the map ring.
+  assert.ok(south.lat < SITE.lat && Number.isFinite(south.elev_m));
+});
+
+test('traceHorizon: batches survive one flaky call, fail closed on two', async () => {
+  let calls = 0;
+  const flakyOnce = async (url) => {
+    calls++;
+    if (calls === 3) throw new Error('blip'); // one mid-trace failure → retried
+    return terrainFetch(() => 100)(url);
+  };
+  const t = await traceHorizon(SITE, 100, { fetchFn: flakyOnce });
+  assert.equal(t.points.length, 36);
+  const alwaysFail = async () => { throw new Error('down'); };
+  await assert.rejects(() => traceHorizon(SITE, 100, { fetchFn: alwaysFail }), /down/);
 });
 
 test('fetchElevations: batch URL + parsed metres, fails closed', async () => {
