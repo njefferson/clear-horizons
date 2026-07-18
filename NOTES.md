@@ -482,6 +482,22 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v1.2.0 — 2026-07-18** (SW cache `horizon-v22`). The second on-device pass —
+  a wave of features + fixes iterated live from Noah's phone. **Live-camera AR
+  capture** (`ui/livecapture.js` + `model/arproject.js`): back-camera viewfinder,
+  the measured horizon drawn over the sky, sweep auto-stops by widest-gap, iOS
+  motion-permission tap, trace silhouette + granularity dots. **Sky-first first
+  run**: seeded placeholder site so Tonight opens onto the graph; a welcome that
+  asks for location; one-tap geolocation AND **city/state/ZIP search**
+  (`model/geocode.js`, Open-Meteo). **Target thumbnails + details page**
+  (`model/thumbnails.js` hips2fits, `ui/targetdetail.js`): per-row preview → a
+  Seestar-style page with a big image, Wikipedia description (`model/describe.js`),
+  a tonight altitude curve, and coordinates. **Night graph**: deep-blue twilight
+  ramp (no black); curves drawn ONLY where clear of the horizon (behind-horizon
+  arcs hidden). **Horizon editor**: records/shows below 0° with an adaptive
+  floor. **Compass**: magnetic→true correction by the bundled **WMM2025** model
+  (`model/geomag.js`, verified against NOAA test values) — the Sun-sight "special
+  filter" calibration is gone. 108 unit, 48 contrast, 19 smoke, 0 axe (28 scans).
 - **v1.1.1 — 2026-07-17** (SW cache `horizon-v11`). Accessibility round 2, from
   an independent fresh-eyes audit of v1.1.0 (things axe/contrast structurally
   can't see). Fixes: focus no longer thrown to the heading on in-view repaints

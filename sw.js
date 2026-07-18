@@ -1,7 +1,7 @@
 // Horizon Planner service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v22'; // WIP: WMM declination auto-calibration (Sun calibration removed) (unreleased)
+const CACHE = 'horizon-v22'; // app v1.2.0 — device-pass wave: live camera, sky-first first run, city/ZIP location, target thumbnails + details, blue graph + horizon-cut arcs, WMM declination
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',
