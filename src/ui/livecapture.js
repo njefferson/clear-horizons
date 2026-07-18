@@ -26,7 +26,12 @@
 // =============================================================================
 import { el, clear, toast } from './dom.js';
 import { activeSite, saveSiteHorizon } from '../model/sites.js';
-import { makeHorizon, maxAltitude, sampleAt } from '../model/horizon.js';
+import { makeHorizon, maxAltitude, sampleAt, toStellarium } from '../model/horizon.js';
+import {
+  PANO_W, PANO_H, STRIP_HALF_DEG,
+  stripPlacement, makeCoverage, markCovered, coverageStats, buildLandscapeIni,
+} from '../model/panorama.js';
+import { makeZip } from '../model/zip.js';
 import { declination, modelExpired } from '../model/geomag.js';
 import {
   headingFromAlpha, applyOffset,
@@ -57,6 +62,8 @@ function freshState() {
     session: makeSession(1),
     fov: { ...DEFAULT_FOV },
     raf: 0,
+    video: null,           // the live <video> — the panorama paints from it
+    pano: null,            // { canvas, ctx, cov } — lazily created on first Record
   };
 }
 
@@ -113,10 +120,13 @@ export function renderLiveCapture(app, state, nav) {
     el('div.lc-btns', {}, [
       el('button.btn', { onclick: resetSweep }, 'Reset'),
       el('button.btn.primary', { onclick: () => save(site, nav) }, 'Save'),
+      el('button.btn', { id: 'lc-export', disabled: true, onclick: () => exportLandscape(site), 'aria-label': 'Export a Stellarium landscape: the recorded panorama image with the horizon data' }, '⬇ Export landscape'),
       el('button.btn', { onclick: () => { stopLive(); nav.go('#/capture'); }, 'aria-label': 'Switch to no-camera sensor capture' }, 'No camera'),
     ]),
     el('p.small.mono', { id: 'lc-cov' }, covText()),
-    el('p.dim.small', {}, 'Keep the centre crosshair on the treetops and pan slowly all the way around — the purple trace fills in behind you (about 1° detail). Pan slowly where the outline is busy; go once around and it stops itself. Small gaps fill in automatically; for a tricky spot, nudge the reticle onto it and Mark. Camera off? Use no-camera mode or the Horizon editor.'),
+    // The panorama build-up — silent text like the coverage line (a stream).
+    el('p.small.mono', { id: 'lc-pano' }, panoText()),
+    el('p.dim.small', {}, 'Keep the centre crosshair on the treetops and pan slowly all the way around — the purple trace fills in behind you (about 1° detail). Pan slowly where the outline is busy; go once around and it stops itself. Small gaps fill in automatically; for a tricky spot, nudge the reticle onto it and Mark. Recording also paints a panorama of your spin — Export landscape bundles it WITH the horizon data as a Stellarium landscape. Camera off? Use no-camera mode or the Horizon editor.'),
   ]);
 
   // Reticle keyboard path lives on a focusable region over the video.
@@ -178,6 +188,7 @@ async function startCamera(video, canvas) {
     const stream = await md.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
     if (!mounted()) { stopTracks(stream); return; } // navigated away mid-await
     lc.stream = stream;
+    lc.video = video; // the panorama paints strips straight from this element
     video.srcObject = stream;
     video.play().catch(() => {}); // fire-and-forget: awaiting can hang if a frame never paints
     sizeCanvas(canvas, video);
@@ -231,7 +242,74 @@ function onOrientation(e) {
   if (heading == null || e.beta == null) return;
   const alt = Math.max(-90, Math.min(90, e.beta - 90)); // camera-pointing model
   lc.cam = { az: applyOffset(heading, lc.offset), alt };
-  if (lc.recording) addSample(lc.session, lc.cam.az, alt); // record the axis (reticle at 0)
+  if (lc.recording) {
+    addSample(lc.session, lc.cam.az, alt); // record the axis (reticle at 0)
+    paintStrip(); // the same spin paints the panorama (per event, not per frame — a fast spin still lands dense strips)
+  }
+}
+
+// --- panorama ----------------------------------------------------------------
+function makePano() {
+  const canvas = el('canvas');
+  canvas.width = PANO_W; canvas.height = PANO_H;
+  // Transparent init: unpainted sky stays transparent, which Stellarium
+  // renders as sky through the maptex — exactly right for missed patches.
+  return { canvas, ctx: canvas.getContext('2d'), cov: makeCoverage() };
+}
+
+// Paint the CENTRE vertical columns of the current video frame at this
+// sample's azimuth/altitude. Roll (γ) is ignored — a v1 simplification (the
+// sweep is held upright); see model/panorama.js.
+function paintStrip() {
+  const v = lc.video, p = lc.pano;
+  if (!v || !p || v.readyState < 2 || !v.videoWidth) return; // no frames → no paint
+  const { bands, yTop, yBottom } = stripPlacement(lc.cam.az, lc.cam.alt, lc.fov.vfov);
+  if (yBottom <= yTop) return;
+  const srcW = Math.max(1, (v.videoWidth * 2 * STRIP_HALF_DEG) / lc.fov.hfov);
+  const sx = (v.videoWidth - srcW) / 2;
+  for (const b of bands) {
+    if (b.x1 <= b.x0) continue;
+    p.ctx.drawImage(v, sx, 0, srcW, v.videoHeight, b.x0, yTop, b.x1 - b.x0, yBottom - yTop);
+  }
+  markCovered(p.cov, lc.cam.az);
+}
+
+function panoText() {
+  if (!lc || !lc.pano) return 'Panorama: record a sweep to build one.';
+  const s = coverageStats(lc.pano.cov);
+  return s.deg
+    ? `Panorama: ${s.deg}° of 360° painted.`
+    : 'Panorama: no camera frames yet — keep the camera view live while recording.';
+}
+
+// Export the recorded panorama + the horizon DATA as one Stellarium landscape
+// package — "being able to use that data in other tools … is ultimately the
+// whole point" (Noah). Flat entries: Stellarium's Add-landscape wants
+// landscape.ini at the archive root.
+async function exportLandscape(site) {
+  if (!lc || !lc.pano) return;
+  try {
+    const profile = lc.session.bins.size
+      ? profileFromSession(lc.session, makeHorizon(site.horizon)) // exactly what Save would save
+      : makeHorizon(site.horizon);
+    const png = await new Promise((res) => lc.pano.canvas.toBlob(res, 'image/png'));
+    if (!png) { toast('Could not encode the panorama image here.'); return; }
+    const ini = buildLandscapeIni({ name: site.name, lat: site.lat, lon: site.lon, elevation_m: site.elevation_m });
+    const zip = makeZip([
+      { name: 'landscape.ini', data: new TextEncoder().encode(ini) },
+      { name: 'panorama.png', data: new Uint8Array(await png.arrayBuffer()) },
+      { name: 'horizon.txt', data: new TextEncoder().encode(toStellarium(profile)) },
+    ]);
+    const slug = (site.name || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'site';
+    const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
+    const a = el('a', { href: url, download: `landscape-${slug}.zip` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Exported Stellarium landscape (image + horizon data).');
+    say('Landscape exported — install in Stellarium: Sky and viewing options → Landscape → Add landscape.');
+  } catch {
+    toast('Export not available here.');
+  }
 }
 
 // --- reticle -----------------------------------------------------------------
@@ -274,6 +352,7 @@ function toggleRecording() {
   if (!lc) return;
   // Arm before the first compass read is fine — samples start when it arrives.
   if (!lc.recording && !lc.cam) say('Armed — recording begins once the compass reads. Enable motion access if nothing happens.');
+  if (!lc.recording && !lc.pano) lc.pano = makePano(); // persists across stop/re-record; Reset clears
   lc.recording = !lc.recording;
   paintRecBtn();
   updateCoverage();
@@ -307,6 +386,7 @@ function markPoint() {
 function resetSweep() {
   if (!lc) return;
   lc.session = makeSession(1);
+  lc.pano = null; // a fresh sweep paints a fresh panorama
   lc.recording = false;
   const rec = root.querySelector('#lc-rec');
   if (rec) { rec.textContent = '● Record'; rec.classList.remove('rec'); rec.setAttribute('aria-label', 'Record sweep'); }
@@ -433,6 +513,10 @@ function covText() {
 function updateCoverage() {
   const n = root && root.querySelector('#lc-cov');
   if (n) n.textContent = covText();
+  const pn = root && root.querySelector('#lc-pano');
+  if (pn) pn.textContent = panoText();
+  const ex = root && root.querySelector('#lc-export');
+  if (ex) ex.disabled = !(lc && lc.pano && coverageStats(lc.pano.cov).deg > 0);
 }
 function say(msg) {
   const n = root && root.querySelector('#lc-status');

@@ -307,18 +307,18 @@ next capture iteration:
   time as you set each azimuth — you see the profile take shape on the sky.
 - **Auto-trace (stretch)**: sky-vs-not-sky segmentation logs the skyline as you
   turn — no manual reticle.
-- **Panorama export — PROMOTED from stretch to the headline ask (Noah,
-  2026-07-18)**: spin in a circle, record a panoramic/3D image, export it
-  WITH the horizon data for Stellarium landscapes and other software —
-  "being able to use that data in other tools … is ultimately the whole
-  point." (Format is open: equirectangular strip is the natural fit for a
-  Stellarium `spherical` landscape.) **The full workflow Noah confirmed
-  (2026-07-18, post-trace): terrain trace SEEDS the horizon → camera scan
-  REFINES it (seeded capture: the sweep should start from the current
-  profile and refine wedges rather than wholesale-replace, so unswept
-  azimuths keep the terrain baseline — a capture.js change, not yet built)
-  → export photo + data together.** The v2.9.0 post-trace next-steps card
-  walks users along this path today (trace → camera → editor/export).
+- **Panorama export — SHIPPED v2.13.0** (was the promoted headline ask):
+  the live-camera sweep now paints an equirectangular panorama strip while
+  it records, and ⬇ Export landscape bundles **landscape.ini +
+  panorama.png + horizon.txt** into a store-only zip Stellarium installs
+  directly (`spherical` maptex for the PHOTO, `polygonal_horizon_list` so
+  the MEASURED DATA drives the horizon math). Noah's "being able to use
+  that data in other tools … is ultimately the whole point" — satisfied:
+  image and data leave together. Seeded capture (v2.11.0) closed the
+  trace → scan link; this closes scan → export. v1 output is a rough
+  stitched strip (per-strip exposure banding, hard seams, γ ignored, FOV
+  skew) — refinement iterates from device passes, incl. confirming
+  `angle_rotatez = 0` north-alignment in Stellarium itself.
 Keep the current sensor path as the no-camera fallback. Device-only,
 NEEDS-HIS-HANDS. Accessibility note (standing order): the reticle needs a
 keyboard/manual-entry equivalent, and the AR bar-graph carries a text/numeric
@@ -500,6 +500,28 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.13.0 — 2026-07-18** (SW cache `horizon-v45`). **Panorama + Stellarium
+  landscape export — the headline ask, shipped.** While the live-camera
+  sweep records, each orientation sample also paints the centre columns of
+  the video frame onto a 2048×1024 equirect canvas (`model/panorama.js`:
+  x=0 = true north matching toStellarium's convention; +90° = row 0 — the
+  sign unit tests exist because a flip paints the world upside down; seam
+  strips split, never wrapped; γ ignored, a documented v1 simplification).
+  ⬇ Export landscape (enabled once any strip is painted, disabled with a
+  plain reason otherwise) bundles landscape.ini + panorama.png + horizon.txt
+  — the ini pairs the photo (spherical maptex) with the measured data
+  (polygonal_horizon_list) so Stellarium DRAWS the picture and COMPUTES on
+  the data. Zip is a hand-rolled store-only writer (`model/zip.js`, ~70
+  lines: LE DataView fields, unsigned CRC-32 verified against the canonical
+  0xCBF43926 check value, DOS date packing) — no dependencies, per the
+  no-build rule. Panorama coverage is a silent text line; export announces
+  once via role=status with the Stellarium install path. 172 unit (zip
+  round-tripped by a reader in the test; strip/seam/sign/coverage; ini),
+  50 contrast (no new pairs), 26 smoke (ANIMATED camera mock so frames
+  actually flow; the exported zip's bytes verified in-page: PK signature,
+  all three names, spherical, EOCD at len−22), 0 axe (34 scans).
+  NEEDS-HIS-HANDS: a real spin → install the zip in Stellarium → check
+  north alignment (angle_rotatez), seam/exposure quality, vertical scale.
 - **v2.12.0 — 2026-07-18** (SW cache `horizon-v44`). **Purpose up front**
   (Noah's ask): the first-run welcome now STATES what the app is for — every
   planner assumes a flat horizon; this one measures yours and plans around

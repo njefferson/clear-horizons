@@ -369,14 +369,19 @@ await step('capture: synthetic sensor sweep bins, covers the circle, saves', asy
   ok(/tallest 18°/.test(max), `captured treeline applied: ${max}`);
 });
 
-await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep saves', async () => {
-  // No real camera in headless — hand getUserMedia a canvas stream so the
-  // viewfinder path (video + overlay canvas + draw loop) runs end to end.
+await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep saves + landscape export', async () => {
+  // No real camera in headless — hand getUserMedia an ANIMATED canvas stream
+  // (a static canvas can deliver zero frames, leaving video.readyState at 0,
+  // which would correctly disable the panorama) so the viewfinder path AND
+  // the panorama strip-painting run end to end.
   await page.evaluate(() => {
     if (!navigator.mediaDevices) Object.defineProperty(navigator, 'mediaDevices', { value: {}, configurable: true });
     navigator.mediaDevices.getUserMedia = async () => {
       const c = document.createElement('canvas'); c.width = 64; c.height = 64;
-      return c.captureStream(1);
+      const ctx = c.getContext('2d');
+      let hue = 0;
+      setInterval(() => { ctx.fillStyle = `hsl(${(hue += 37) % 360} 80% 60%)`; ctx.fillRect(0, 0, 64, 64); }, 100);
+      return c.captureStream(10);
     };
     location.hash = '#/capture/live';
   });
@@ -413,6 +418,34 @@ await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep save
   ok(/traced|✓/.test(cov), `full-circle traced over the camera path: ${cov}`);
   const readout = await page.$eval('#lc-readout', (e) => e.textContent);
   ok(/az \d+° · reticle -?\d+° alt/.test(readout), `live numeric readout present: ${readout}`);
+
+  // Panorama (v2.13.0): the sweep painted strips; export bundles a REAL zip.
+  const panoLine = await page.$eval('#lc-pano', (e) => e.textContent);
+  ok(/\d+° of 360° painted/.test(panoLine), `panorama painted during the sweep: ${panoLine}`);
+  ok(!(await page.$eval('#lc-export', (e) => e.disabled)), 'Export landscape enabled after a sweep');
+  await page.evaluate(() => {
+    window.__zip = null;
+    const orig = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = (b) => { window.__zip = b; return orig(b); };
+  });
+  await page.click('#lc-export');
+  await page.waitForFunction(() => !!window.__zip && window.__zip.size > 100);
+  const z = await page.evaluate(async () => {
+    const b = new Uint8Array(await window.__zip.arrayBuffer());
+    const txt = new TextDecoder('latin1').decode(b);
+    return {
+      sig: [b[0], b[1], b[2], b[3]],
+      hasIni: txt.includes('landscape.ini'), hasPng: txt.includes('panorama.png'), hasHz: txt.includes('horizon.txt'),
+      spherical: txt.includes('type = spherical'),
+      eocdAtEnd: txt.lastIndexOf('PK\x05\x06') === b.length - 22,
+    };
+  });
+  ok(z.sig.join(',') === '80,75,3,4', 'zip starts with PK\\x03\\x04');
+  ok(z.hasIni && z.hasPng && z.hasHz, 'landscape.ini + panorama.png + horizon.txt all packaged');
+  ok(z.spherical, 'spherical landscape declared');
+  ok(z.eocdAtEnd, 'end-of-central-directory record closes the archive');
+  ok(/Landscape exported/.test(await page.$eval('#lc-status', (e) => e.textContent)), 'export announced via role=status');
+
   await shot('livecapture.png');
   await page.click('.lc-controls .btn.primary:has-text("Save")');
   await page.waitForSelector('.hz-svg'); // lands back on the editor
