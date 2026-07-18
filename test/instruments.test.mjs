@@ -37,6 +37,42 @@ test('FOV computes from focal length + sensor, not a constant', () => {
   assert.ok(f30.w_deg > f50.w_deg, 'S30 frames wider than S50');
 });
 
+test('preset library: FOVs compute to the published optics', () => {
+  // Spec-driven, computed — where a maker publishes a FOV it must agree.
+  const expect = [
+    ['dwarf2', 3.19, 1.79],        // 100 mm + IMX415 (3840×2160 @ 1.45 µm)
+    ['dwarf3', 2.93, 1.65],        // 150 mm + IMX678 (3840×2160 @ 2.0 µm)
+    ['vespera', 1.60, 0.90],       // 200 mm + IMX462 — same chip as the S50
+    ['vespera2', 2.55, 1.44],      // 250 mm + IMX585; ~2.5°×1.4° published.
+    //             ^ made to fail once with 1.60 (the original Vespera's width,
+    //               which one review misattributes to the II) — it did.
+    ['vespera-pro', 1.62, 1.62],   // 250 mm + IMX676 square sensor
+  ];
+  for (const [id, w, h] of expect) {
+    const inst = instrumentById(id);
+    assert.ok(inst, `preset ${id} exists`);
+    const f = fovOf(inst);
+    near(f.w_deg, w, 0.02, `${id} width`);
+    near(f.h_deg, h, 0.02, `${id} height`);
+  }
+});
+
+test('preset library: ids unique, every profile complete', () => {
+  const all = allInstruments();
+  assert.equal(new Set(all.map((p) => p.id)).size, all.length, 'no duplicate ids');
+  for (const p of all) {
+    const f = fovOf(p);
+    assert.ok(Number.isFinite(f.w_deg) && f.w_deg > 0, `${p.id} FOV computes`);
+    assert.ok(p.mount && typeof p.mount.altAz === 'boolean', `${p.id} has a mount profile`);
+    assert.ok(p.name && p.focalLength_mm > 0, `${p.id} named + focal`);
+  }
+  // The square-sensor Pro frames square; the EQ flags follow the makers.
+  const pro = fovOf(instrumentById('vespera-pro'));
+  near(pro.w_deg, pro.h_deg, 1e-9, 'Vespera Pro is square');
+  assert.equal(instrumentById('dwarf3').mount.eqCapable, true, 'Dwarf 3 has EQ mode');
+  assert.equal(instrumentById('dwarf2').mount.eqCapable, false, 'Dwarf II does not');
+});
+
 test('fovOf honours an explicit override', () => {
   const custom = { focalLength_mm: 999, sensor: { w_mm: 1, h_mm: 1 }, fov: { w_deg: 3.3, h_deg: 2.2 } };
   const f = fovOf(custom);

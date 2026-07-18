@@ -1,7 +1,7 @@
 // Horizon Planner service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v29'; // app v2.3.0 — "Point to the pole" live AR aid (#/polar/aim): camera + compass guidance locks the polar axis on the NCP/SCP, horizon-aware
+const CACHE = 'horizon-v30'; // app v2.4.0 — instrument preset library (Dwarf II/3, Vespera/II/Pro, spec-verified) + sensor-mm entry in the custom-scope editor
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',

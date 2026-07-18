@@ -465,7 +465,7 @@ await step('sky (AR): "View in sky" opens #/sky; camera overlay, Moon in the lis
 await step('settings: custom scope — live FOV preview, save, active, remove', async () => {
   await tab('Settings');
   await page.waitForSelector('.inst-card'); // hashchange renders async — wait, don't race
-  ok(await page.$$eval('.inst-card', (e) => e.length) === 2, 'two presets to start');
+  ok(await page.$$eval('.inst-card', (e) => e.length) === 7, 'seven library presets to start (S50/S30/Dwarf II/Dwarf 3/Vespera/II/Pro)');
   await page.click('.row-actions .btn:has-text("Add custom telescope")');
   await page.fill('dialog input[placeholder="e.g. RedCat 51 + ASI533"]', 'Smoke Scope');
   await page.fill('dialog input[placeholder="250"]', '250');
@@ -476,11 +476,23 @@ await step('settings: custom scope — live FOV preview, save, active, remove', 
   ok(/1\.28° × 0\.72°/.test(prev), `live FOV preview (S50 optics): ${prev}`);
   await shot('custom-scope.png');
   await page.click('dialog .btn.primary');
-  await page.waitForSelector('.inst-card:nth-child(3)');
+  await page.waitForSelector('.inst-card:nth-child(8)');
   ok(/Smoke Scope/.test(await page.$eval('.inst-card.active', (e) => e.textContent)), 'new scope is active');
   await page.click('.inst-card.active .btn.danger'); // confirm auto-accepted
-  await page.waitForSelector('.inst-card:nth-child(3)', { state: 'detached' });
+  await page.waitForSelector('.inst-card:nth-child(8)', { state: 'detached' });
   ok(/Seestar S50/.test(await page.$eval('.inst-card.active', (e) => e.textContent)), 'falls back to the S50');
+
+  // mm entry path (v2.4.0): a camera-lens style spec — sensor millimetres, no
+  // pixel pitch — computes the FOV live (no ″/px, there's no pitch to scale).
+  await page.click('.row-actions .btn:has-text("Add custom telescope")');
+  await page.fill('dialog input[placeholder="250"]', '200');
+  await page.fill('dialog input[placeholder="23.5"]', '11.1');
+  await page.fill('dialog input[placeholder="15.6"]', '6.3');
+  const mmPrev = await page.$eval('.fov-preview', (e) => e.textContent);
+  ok(/FOV 3\.18° × 1\.80°/.test(mmPrev), `mm-path FOV computes: ${mmPrev}`);
+  ok(!/″\/px/.test(mmPrev), 'no pixel scale claimed without a pixel pitch');
+  await page.click('dialog .btn.ghost'); // cancel — nothing saved
+  await page.waitForSelector('.loc-dialog', { state: 'detached' });
 });
 
 await step('polar align: aim card renders from the site, horizon-aware', async () => {

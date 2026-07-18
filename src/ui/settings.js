@@ -74,9 +74,10 @@ function spec(label, value) {
 }
 
 // --- custom-scope form --------------------------------------------------------
-// Focal length + sensor pixels × pixel pitch → FOV is computed live, exactly as
-// the model will see it. Pixels + µm is how every astro camera is specced; a
-// sensor-mm entry mode stays on the roadmap.
+// Focal length + sensor → FOV is computed live, exactly as the model will see
+// it. Two sensor entry paths: pixels × pixel pitch (how astro cameras are
+// specced — also yields the ″/px scale), or plain sensor millimetres (how
+// camera-lens spec sheets read). Whichever is filled in wins; px+µm first.
 function openScopeForm(nav) {
   document.querySelector('.loc-dialog')?.remove();
   const name = el('input.loc-in', { type: 'text', placeholder: 'e.g. RedCat 51 + ASI533' });
@@ -85,21 +86,33 @@ function openScopeForm(nav) {
   const wpx = el('input.loc-in', { type: 'number', min: '1', step: '1', placeholder: '1920' });
   const hpx = el('input.loc-in', { type: 'number', min: '1', step: '1', placeholder: '1080' });
   const pum = el('input.loc-in', { type: 'number', min: '0.01', step: '0.01', placeholder: '2.9' });
+  const wmm = el('input.loc-in', { type: 'number', min: '0.1', step: '0.1', placeholder: '23.5' });
+  const hmm = el('input.loc-in', { type: 'number', min: '0.1', step: '0.1', placeholder: '15.6' });
   const altAz = el('input', { type: 'checkbox', checked: true });
   const eq = el('input', { type: 'checkbox' });
   const dz = el('input.loc-in', { type: 'number', min: '0', max: '90', step: '1', value: '85' });
   const preview = el('p.fov-preview.dim.small', {}, 'FOV — enter focal length and sensor.');
 
+  // Whichever sensor spec is complete: pixels + pitch preferred (it also gives
+  // the pixel scale), else millimetres.
+  const readSensor = () => {
+    const w = parseFloat(wpx.value), h = parseFloat(hpx.value), p = parseFloat(pum.value);
+    if (w > 0 && h > 0 && p > 0) return { w_px: w, h_px: h, pixel_um: p };
+    const wm = parseFloat(wmm.value), hm = parseFloat(hmm.value);
+    if (wm > 0 && hm > 0) return { w_mm: wm, h_mm: hm };
+    return null;
+  };
   const readProfile = () => {
-    const f = parseFloat(focal.value), w = parseFloat(wpx.value), h = parseFloat(hpx.value), p = parseFloat(pum.value);
-    if (!(f > 0 && w > 0 && h > 0 && p > 0)) return null;
+    const f = parseFloat(focal.value);
+    const sensor = readSensor();
+    if (!(f > 0) || !sensor) return null;
     const a = parseFloat(aperture.value);
     const zenith = altAz.checked ? Math.max(0, Math.min(90, parseFloat(dz.value) || 0)) : 0;
     return makeCustomInstrument({
       name: name.value.trim() || 'Custom scope',
       focalLength_mm: f,
       aperture_mm: a > 0 ? a : null,
-      sensor: { w_px: w, h_px: h, pixel_um: p },
+      sensor,
       mount: { altAz: altAz.checked, eqCapable: eq.checked, zenithDeadZone_deg: zenith },
     });
   };
@@ -107,10 +120,10 @@ function openScopeForm(nav) {
     const prof = readProfile();
     if (!prof) { preview.textContent = 'FOV — enter focal length and sensor.'; return; }
     const fov = fovOf(prof);
-    const ps = pixelScale(prof);
-    preview.textContent = `FOV ${fov.w_deg.toFixed(2)}° × ${fov.h_deg.toFixed(2)}° · ${ps.toFixed(2)}″/px`;
+    const ps = pixelScale(prof); // null on the mm path — no pitch to scale from
+    preview.textContent = `FOV ${fov.w_deg.toFixed(2)}° × ${fov.h_deg.toFixed(2)}°${ps ? ` · ${ps.toFixed(2)}″/px` : ''}`;
   };
-  for (const inp of [focal, wpx, hpx, pum]) inp.addEventListener('input', updatePreview);
+  for (const inp of [focal, wpx, hpx, pum, wmm, hmm]) inp.addEventListener('input', updatePreview);
 
   const dlg = el('dialog.loc-dialog', { 'aria-labelledby': 'scope-form-title' }, [
     el('h2', { id: 'scope-form-title' }, 'Add custom telescope'),
@@ -118,6 +131,8 @@ function openScopeForm(nav) {
       labeled('Name', name),
       el('div.sensor-row', {}, [labeled('Focal length (mm)', focal), labeled('Aperture (mm)', aperture)]),
       el('div.sensor-row', {}, [labeled('Sensor width (px)', wpx), labeled('Height (px)', hpx), labeled('Pixel (µm)', pum)]),
+      el('p.dim.small.sensor-or', {}, 'or, if the spec sheet gives the sensor in millimetres:'),
+      el('div.sensor-row', {}, [labeled('Sensor width (mm)', wmm), labeled('Height (mm)', hmm)]),
       preview,
       el('label.toggle-row.small-gap', {}, [altAz, el('span', {}, 'Alt-az mount (has a zenith dead-zone)')]),
       labeled('Zenith dead-zone starts at (° altitude)', dz),
@@ -127,7 +142,7 @@ function openScopeForm(nav) {
       el('button.btn.ghost', { onclick: () => dlg.close() }, 'Cancel'),
       el('button.btn.primary', { onclick: () => {
         const prof = readProfile();
-        if (!prof) { toast('Enter focal length and sensor width / height / pixel size.'); return; }
+        if (!prof) { toast('Enter focal length plus a sensor: width / height / pixel size in px + µm, or width / height in mm.'); return; }
         addCustomInstrument(prof);        // replaces by id if the name recurs
         setActiveInstrument(prof.id);
         dlg.close(); nav.rerender();

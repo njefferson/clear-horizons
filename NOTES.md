@@ -10,8 +10,9 @@ The AR sky view that used to headline this block SHIPPED as v2.0.0; weather
 shipped as v2.1.0/v2.2.0; the polar "point to the pole" live aid as v2.3.0.
 What's next, in rough order:
 - **Remote-buildable roadmap next-ups:** offline thumbnail precache (the
-  stated "still to come" half of the details page), instrument preset library
-  (Dwarf/Vespera + sensor-mm entry), map-pin terrain horizon (the big one).
+  stated "still to come" half of the details page), the framing overlay
+  (active FOV rectangle + mosaic grid over the object image — the last piece
+  of the multi-instrument item), map-pin terrain horizon (the big one).
 - Device pass through v2.3.0 (incl. the polar-aim lock feel) **done — Noah,
   2026-07-18**. Repo metadata (About fields + v2.0.2 social preview) confirmed
   done the same day — the CLAUDE.md ritual is satisfied for this art rev.
@@ -389,11 +390,13 @@ tools:**
 - **Multi-instrument + custom sensor** (the instrument model is built in v1; this is
   the fuller UX on top): a preset library (S30, Dwarf II/3, Vespera, …) plus a
   **custom-scope editor** (enter focal length + sensor mm or px + pixel size → FOV)
-  so anyone can plan for any telescope — *the px+µm editor shipped in v1.1; mm
-  entry + a preset library remain*. A **framing overlay** draws the active FOV
-  rectangle (+ mosaic grid) over the object thumbnail. Presets ship in
-  `data/instruments.js`; customs persist in `horizon.instruments` and
-  export/import with sites so they aren't trapped in one browser.
+  so anyone can plan for any telescope — *the px+µm editor shipped in v1.1;
+  the preset library (Dwarf II, Dwarf 3, Vespera, Vespera II, Vespera Pro —
+  spec-verified, FOV computed) + sensor-mm entry shipped in v2.4.0*. What
+  remains: a **framing overlay** drawing the active FOV rectangle (+ mosaic
+  grid) over the object thumbnail. Presets ship in `data/instruments.js`;
+  customs persist in `horizon.instruments` and export/import with sites so
+  they aren't trapped in one browser.
 - **Weather overlay (Astroweather)** — SHIPPED in full: clouds v2.1.0, the rest
   v2.2.0 (Noah's Clear-Sky-Chart reference): hi/mid/lo clouds + 7Timer seeing/
   transparency + on-device darkness + wind/RH/°F, all under the night graph on
@@ -473,6 +476,21 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.4.0 — 2026-07-18** (SW cache `horizon-v30`). **Instrument preset
+  library + sensor-mm entry** (the multi-instrument roadmap item, minus the
+  framing overlay). Five new bundled presets in `data/instruments.js`:
+  Dwarf II (100 mm f/4.2, IMX415), Dwarf 3 (150 mm f/4.3, IMX678, EQ mode),
+  Vaonis Vespera (200 mm f/4, IMX462), Vespera II (250 mm f/5, IMX585),
+  Vespera Pro (250 mm f/5, IMX676 square). Every FOV is COMPUTED from
+  maker-published sensor pixels × pitch (verified against dwarflab.com /
+  vaonis.com + reviews, 2026-07-18) — a review's misquoted Vespera II FOV
+  (1.6°, actually the original's) was caught by exactly this rule; the shared
+  85° dead-zone is the generic alt-az default, not per-model data. The
+  custom-scope editor gains the **sensor-mm path** (width/height in mm when
+  there's no pixel spec; no ″/px claimed without a pitch). No new tokens,
+  routes, or contrast pairs; the Settings cards are the existing
+  aria-pressed + "active"-label pattern. 138 unit (Vespera II FOV made to
+  fail once on the misquote), 50 contrast, 21 smoke, 0 axe (32 scans).
 - **v2.3.0 — 2026-07-18** (SW cache `horizon-v29`). **"Point to the pole" live
   aid** — the last unbuilt half of Polar Align, assembled from the shipped AR
   stack. New `ui/polaraim.js` (`#/polar/aim`, hero CTA on the Polar tab): hold
