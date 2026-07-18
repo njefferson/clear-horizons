@@ -116,6 +116,7 @@ function buildShell(app, site, nav) {
     head, caveat, mapBox, tileStatus,
     el('div.card-actions', {}, [traceBtn]),
     progress, summary, statusNode,
+    el('div.tm-next', { id: 'tm-next' }), // next-steps card, filled after a successful trace
     el('p.settings-foot', {}, 'The trace samples elevations along 36 rays (dense nearby, out to 40 km), keeps each ray’s HIGHEST apparent point — near ground can out-block a distant ridge — and applies the result to this site’s horizon (Undo in the toast). Tap the map to start a new site somewhere else. One trace uses almost all of the free elevation service’s one-minute allowance, so the button rests about a minute between runs — tracing sooner would only hit the service’s limit and stall.'),
   );
   app.append(root);
@@ -242,6 +243,20 @@ async function runTrace(nav) {
     toast(`Terrain horizon applied to ${site.name}.`, {
       action: { label: 'Undo', onClick: () => { saveSiteHorizon(site.id, before); say('Terrain horizon undone — previous profile restored.'); } },
     });
+
+    // The hand-off (device-pass gap: "nothing guides the user after the
+    // map"): the trace is the terrain-only BASELINE — the camera adds what
+    // elevation data can't see, and export carries it into other tools.
+    const next = root.querySelector('#tm-next');
+    if (next) {
+      next.replaceChildren(
+        el('p.dim.small', {}, '✓ Terrain baseline saved. Next: the camera adds what elevation data can’t see — trees, buildings — and Export (Horizon page) carries it into Stellarium. A photo + data panorama export is on the roadmap.'),
+        el('div.card-actions', {}, [
+          el('button.btn.primary', { onclick: () => { stopTerrainMap(); nav.go('#/capture/live'); } }, '📷 Refine with the camera'),
+          el('button.btn', { onclick: () => { stopTerrainMap(); nav.go('#/horizon'); } }, '✏️ View & edit horizon'),
+        ]),
+      );
+    }
   } catch (err) {
     // Name the ACTUAL failure (HTTP status, shape, network) — a generic
     // "unreachable" hides the diagnosis, the v2.6.x tile lesson.

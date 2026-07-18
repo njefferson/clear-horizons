@@ -206,6 +206,20 @@ await step('horizon editor: 36 handles; keyboard nudge writes through', async ()
   const readout = await page.$eval('.hz-readout', (e) => e.textContent);
   ok(/0° · 3°/.test(readout), `readout after 3 nudges: ${readout}`);
   ok(await page.$eval('.hz-handle[data-i="0"]', (e) => e.getAttribute('aria-valuenow')) === '3', 'slider exposes aria-valuenow=3');
+
+  // Undo/redo (device-pass ask): each nudge is one undoable gesture.
+  await page.click('.hz-actions .btn:has-text("Undo")');
+  ok(await page.$eval('.hz-handle[data-i="0"]', (e) => e.getAttribute('aria-valuenow')) === '2', 'undo steps the last nudge back');
+  await page.click('.hz-actions .btn:has-text("Redo")');
+  ok(await page.$eval('.hz-handle[data-i="0"]', (e) => e.getAttribute('aria-valuenow')) === '3', 'redo restores it');
+
+  // Deliberate touch (device pass: "too touch-delicate"): a press on the chart
+  // BACKGROUND must edit nothing — only the handles themselves drag.
+  const before = await page.$$eval('.hz-handle', (els) => els.map((e) => e.getAttribute('aria-valuenow')).join(','));
+  await page.click('.hz-svg', { position: { x: 200, y: 30 } });
+  const after = await page.$$eval('.hz-handle', (els) => els.map((e) => e.getAttribute('aria-valuenow')).join(','));
+  ok(before === after, 'chart background press edits nothing (scroll-safe)');
+  await page.focus('.hz-handle[data-i="0"]'); // the background click moved focus — take it back
   // Depressed horizons: the editor now records and shows below 0° (downhill).
   for (let k = 0; k < 8; k++) await page.keyboard.press('ArrowDown'); // 3 → -5
   ok(await page.$eval('.hz-handle[data-i="0"]', (e) => Number(e.getAttribute('aria-valuenow'))) === -5, 'handle edits below 0° (depressed horizon)');
@@ -244,6 +258,9 @@ await step('terrain: 360° trace applies the horizon; map tap creates a site', a
   await page.waitForFunction(() => /Trace again in \d+ s/.test(document.querySelector('#tm-trace')?.textContent || ''));
   ok(await page.$eval('#tm-trace', (e) => e.disabled), 'trace button rests after a run');
   ok(/one-minute allowance/.test(await page.$eval('.settings-foot', (e) => e.textContent)), 'the WHY of the rest is stated in the note');
+  // The hand-off: a successful trace guides to the next step in the workflow.
+  const nextCard = await page.$eval('#tm-next', (e) => e.textContent);
+  ok(/Refine with the camera/.test(nextCard) && /Terrain baseline saved/.test(nextCard), `next-steps card guides onward: ${nextCard.slice(0, 60)}`);
   await shot('terrain-trace.png');
 
   // Map tap → a NEW SITE (the map's remaining pointer job); non-pointer site

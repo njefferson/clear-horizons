@@ -6,8 +6,8 @@
 // =============================================================================
 import { el, clear, toast } from './dom.js';
 import {
-  N, azForIndex, indexForAz, setAltitudeAt, sampleAt, maxAltitude,
-  makeHorizon, toStellarium, fromStellarium, ALT_MIN, ALT_MAX,
+  N, azForIndex, setAltitudeAt, sampleAt, maxAltitude,
+  makeHorizon, serializeHorizon, toStellarium, fromStellarium, ALT_MIN, ALT_MAX,
 } from '../model/horizon.js';
 import { activeSite, saveSiteHorizon } from '../model/sites.js';
 
@@ -92,7 +92,11 @@ export function renderHorizonEditor(app, state, nav) {
   svg.append(area, line);
 
   // Draggable handles — each an ARIA slider over 0–90° obstruction altitude.
+  // Each visible handle gets a LARGER invisible hit circle behind the touch:
+  // drags start only on these, never on the chart at large — a scrolling
+  // finger brushing the chart must never edit data (device pass, 2026-07-18).
   const handles = [];
+  const hits = [];
   for (let i = 0; i < N; i++) {
     const h = mk('circle', {
       r: 6, class: 'hz-handle', 'data-i': i, tabindex: 0,
@@ -100,6 +104,8 @@ export function renderHorizonEditor(app, state, nav) {
       'aria-label': `Obstruction altitude ${dirLabel(azForIndex(i))} (${azForIndex(i)}°)`,
     });
     handles.push(h); svg.append(h);
+    const hit = mk('circle', { r: 14, class: 'hz-hit', 'data-i': i, 'aria-hidden': 'true' });
+    hits.push(hit); svg.append(hit);
   }
   const setHandleValue = (i) => {
     const alt = Math.round(sampleAt(profile, azForIndex(i)));
@@ -128,52 +134,94 @@ export function renderHorizonEditor(app, state, nav) {
     for (let i = 0; i < N; i++) {
       handles[i].setAttribute('cx', xOf(azForIndex(i)));
       handles[i].setAttribute('cy', yOf(sampleAt(profile, azForIndex(i))));
+      hits[i].setAttribute('cx', xOf(azForIndex(i)));
+      hits[i].setAttribute('cy', yOf(sampleAt(profile, azForIndex(i))));
       setHandleValue(i);
     }
     header.querySelector('.hz-max').textContent = `tallest ${maxAltitude(profile).toFixed(0)}°`;
   }
 
-  // clientY → altitude (clamped); clientX → nearest row index.
+  // clientY → altitude (clamped).
   function altFromEvent(e) {
     const r = svg.getBoundingClientRect();
     const svgY = ((e.clientY - r.top) / r.height) * VB.h;
     const alt = floorAlt + (1 - (svgY - M.t) / PH) * (ALT_MAX - floorAlt);
     return Math.max(ALT_MIN, Math.min(ALT_MAX, alt));
   }
-  function indexFromEvent(e) {
-    const r = svg.getBoundingClientRect();
-    const svgX = ((e.clientX - r.left) / r.width) * VB.w;
-    const az = ((svgX - M.l) / PW) * 360;
-    return indexForAz(az);
+
+  // Undo/redo (device-pass ask): a snapshot stack of serialized profiles.
+  // One entry per GESTURE (a whole drag, one keypress, a reset, an import) —
+  // restore is byte-identical through the same serialize/parse the sites use.
+  const past = [], future = [];
+  const snap = () => JSON.stringify(serializeHorizon(profile));
+  const restoreSnap = (s) => { Object.assign(profile, makeHorizon(JSON.parse(s))); persist(); redraw(); };
+  function pushHistory() {
+    past.push(snap());
+    if (past.length > 100) past.shift();
+    future.length = 0;
+    refreshUndoUI();
+  }
+  function undo() {
+    if (!past.length) return;
+    future.push(snap());
+    restoreSnap(past.pop());
+    readout.textContent = `undo · tallest ${maxAltitude(profile).toFixed(0)}°`;
+    refreshUndoUI();
+  }
+  function redo() {
+    if (!future.length) return;
+    past.push(snap());
+    restoreSnap(future.pop());
+    readout.textContent = `redo · tallest ${maxAltitude(profile).toFixed(0)}°`;
+    refreshUndoUI();
+  }
+  function refreshUndoUI() {
+    undoBtn.disabled = !past.length;
+    redoBtn.disabled = !future.length;
   }
 
   let dragging = null;
+  let dragOffset = 0;
   function apply(i, alt) {
     setAltitudeAt(profile, i, alt);
     persist();
     redraw();
     readout.textContent = `${azForIndex(i)}° · ${sampleAt(profile, azForIndex(i)).toFixed(0)}°`;
   }
+  // Drags start ONLY on a handle (or its enlarged hit circle) — a touch
+  // anywhere else falls through so the page scrolls instead of editing data
+  // (the old anywhere-on-the-chart edit was the device-pass "too delicate").
+  // The grab is offset-anchored so the handle doesn't jump to the fingertip.
   svg.addEventListener('pointerdown', (e) => {
+    const c = e.target.classList;
+    if (!(c?.contains('hz-handle') || c?.contains('hz-hit'))) return;
     e.preventDefault();
-    const onHandle = e.target.classList?.contains('hz-handle');
-    dragging = onHandle ? Number(e.target.dataset.i) : indexFromEvent(e);
+    pushHistory();
+    dragging = Number(e.target.dataset.i);
+    dragOffset = sampleAt(profile, azForIndex(dragging)) - altFromEvent(e);
     svg.setPointerCapture(e.pointerId);
-    apply(dragging, altFromEvent(e));
   });
-  svg.addEventListener('pointermove', (e) => { if (dragging != null) apply(dragging, altFromEvent(e)); });
+  svg.addEventListener('pointermove', (e) => {
+    if (dragging != null) apply(dragging, altFromEvent(e) + dragOffset);
+  });
   const endDrag = () => { dragging = null; };
   svg.addEventListener('pointerup', endDrag);
   svg.addEventListener('pointercancel', endDrag);
   // Keyboard slider (ARIA slider pattern): Up/Down nudge altitude ±1° (PageUp/
   // Down ±10°, Home/End 90/0°); Left/Right move focus between the 36 azimuth
-  // points so you don't have to Tab through all of them.
+  // points so you don't have to Tab through all of them. Ctrl/Cmd+Z undoes,
+  // +Shift redoes (the buttons are the touch path).
   svg.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      e.shiftKey ? redo() : undo();
+      e.preventDefault();
+      return;
+    }
     const i = Number(e.target.dataset?.i);
     if (Number.isNaN(i)) return;
     const cur = sampleAt(profile, azForIndex(i));
     const alt = { ArrowUp: cur + 1, ArrowDown: cur - 1, PageUp: cur + 10, PageDown: cur - 10, Home: 90, End: 0 };
-    if (e.key in alt) { apply(i, alt[e.key]); e.preventDefault(); }
+    if (e.key in alt) { pushHistory(); apply(i, alt[e.key]); e.preventDefault(); }
     else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       const j = ((i + (e.key === 'ArrowRight' ? 1 : -1)) % N + N) % N;
       handles[j].focus();
@@ -187,20 +235,23 @@ export function renderHorizonEditor(app, state, nav) {
     el('h1', {}, 'Horizon'),
     el('span.hz-max.mono', {}, ''),
   ]);
+  const undoBtn = el('button.btn', { onclick: undo, disabled: true, 'aria-label': 'Undo the last horizon edit' }, '↶ Undo');
+  const redoBtn = el('button.btn', { onclick: redo, disabled: true, 'aria-label': 'Redo the undone horizon edit' }, '↷ Redo');
   const actions = el('div.hz-actions', {}, [
     el('button.chip.ng-site', { onclick: () => nav.go('#/sites'), 'aria-label': `Site: ${site.name} — change` },
       [el('span', { 'aria-hidden': 'true' }, `📍 ${site.name}`)]),
     el('button.btn.primary', { onclick: () => nav.go('#/capture/live'), 'aria-label': 'Measure horizon with the live camera' }, '📷 Measure…'),
     el('button.btn', { onclick: () => nav.go('#/horizon/map'), 'aria-label': 'Trace the terrain horizon automatically from elevation data' }, '🗺 Terrain…'),
-    el('button.btn', { onclick: () => { if (confirm('Reset the horizon to a flat 0°?')) { profile.points = [{ az: 0, alt: 0 }]; persist(); redraw(); toast('Horizon reset to flat.'); } } }, 'Reset'),
-    el('button.btn', { onclick: () => openImport(profile, redraw, persist) }, 'Import…'),
+    undoBtn, redoBtn,
+    el('button.btn', { onclick: () => { if (confirm('Reset the horizon to a flat 0°?')) { pushHistory(); profile.points = [{ az: 0, alt: 0 }]; persist(); redraw(); toast('Horizon reset to flat.'); } } }, 'Reset'),
+    el('button.btn', { onclick: () => openImport(profile, redraw, persist, pushHistory) }, 'Import…'),
     el('button.btn', { onclick: () => exportStellarium(profile, site.name) }, 'Export'),
     readout,
   ]);
 
   app.append(
     header,
-    el('p.dim.small', {}, `Drag each point to the top of the trees or hills blocking that direction from ${site.name}. Everything above this line is what you can actually see.`),
+    el('p.dim.small', {}, `Drag each point to the top of the trees or hills blocking that direction from ${site.name}. Everything above this line is what you can actually see. Only the points themselves drag — the rest of the chart scrolls the page.`),
     el('div.hz-wrap', {}, [svg]),
     actions,
     el('p.settings-foot', {}, 'Saved to this site. Measure… traces the real treeline through the live camera (with a no-camera sensor mode and this editor as backups).'),
@@ -223,7 +274,7 @@ function exportStellarium(profile, siteName) {
   }
 }
 
-function openImport(profile, redraw, persist) {
+function openImport(profile, redraw, persist, pushHistory) {
   document.querySelector('.hz-dialog')?.remove();
   const ta = el('textarea.hz-import', {
     placeholder: 'Paste a Stellarium horizon list:\n0 12\n90 5\n180 20\n…', rows: 8,
@@ -243,6 +294,7 @@ function openImport(profile, redraw, persist) {
       el('button.btn.primary', { onclick: () => {
         try {
           const imported = fromStellarium(ta.value);
+          pushHistory(); // an import is one undoable gesture
           Object.assign(profile, imported);
           persist(); redraw(); dlg.close();
           toast('Horizon imported.');

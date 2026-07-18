@@ -312,7 +312,13 @@ next capture iteration:
   WITH the horizon data for Stellarium landscapes and other software —
   "being able to use that data in other tools … is ultimately the whole
   point." (Format is open: equirectangular strip is the natural fit for a
-  Stellarium `spherical` landscape.)
+  Stellarium `spherical` landscape.) **The full workflow Noah confirmed
+  (2026-07-18, post-trace): terrain trace SEEDS the horizon → camera scan
+  REFINES it (seeded capture: the sweep should start from the current
+  profile and refine wedges rather than wholesale-replace, so unswept
+  azimuths keep the terrain baseline — a capture.js change, not yet built)
+  → export photo + data together.** The v2.9.0 post-trace next-steps card
+  walks users along this path today (trace → camera → editor/export).
 Keep the current sensor path as the no-camera fallback. Device-only,
 NEEDS-HIS-HANDS. Accessibility note (standing order): the reticle needs a
 keyboard/manual-entry equivalent, and the AR bar-graph carries a text/numeric
@@ -494,6 +500,23 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.9.0 — 2026-07-18** (SW cache `horizon-v41`). **Editor robustness +
+  workflow hand-off** (Noah's post-success device pass — the trace WORKS,
+  ~9° terrain ring at the Airport valley site). Three asks: (1) "the top is
+  too touch-delicate" — the editor edited on ANY chart press (pointerdown
+  anywhere set the nearest wedge; touch-action:none ate scrolling). Now
+  drags start ONLY on a handle (each gets an invisible ~3× hit circle),
+  grabs are offset-anchored (no jump to the fingertip), and the chart at
+  large is touch-action:pan-y — a scrolling finger can't edit data. The
+  smoke asserts a background press changes nothing. (2) **Undo/redo**:
+  snapshot stack (one entry per gesture — a whole drag, one nudge, reset,
+  import), ↶/↷ buttons + Ctrl/Cmd+Z / +Shift+Z on the chart, restore is
+  byte-identical via serializeHorizon. (3) "nothing guides the user after
+  the map" — a post-trace next-steps card: terrain is the BASELINE, 📷
+  Refine with the camera / ✏️ View & edit horizon, with the
+  photo+data-export destination named. Roadmap: seeded capture recorded
+  (camera refines rather than replaces — not yet built). 157 unit, 50
+  contrast, 24 smoke, 0 axe (34 scans). NEEDS-HIS-HANDS: the drag feel.
 - **v2.8.2 — 2026-07-18** (SW cache `horizon-v40`). **Trace cooldown**
   (Noah's ask: prevent the try-again-too-fast frustration, and say why).
   One trace spends nearly the whole elevation-service minute budget, so the
