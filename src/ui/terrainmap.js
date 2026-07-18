@@ -173,11 +173,18 @@ async function initMap(site) {
 // of the v2.6.1 diagnostic, which the elevation message clobbered.
 function addTileSource(map, L, idx) {
   const s = SOURCES[idx];
-  let errors = 0, anyLoaded = false, swapped = false;
+  let errors = 0, anyLoaded = false, swapped = false, deadSaid = false;
   const layer = L.tileLayer(s.url, { maxZoom: s.maxZoom, attribution: s.attrib }).addTo(map);
-  // Success only clears the line for the PRIMARY source — after a swap the
-  // "switched to …" note stays, so the topo map never looks unexplained.
-  layer.on('tileload', () => { if (!anyLoaded) { anyLoaded = true; if (idx === 0) tileSay(''); } });
+  layer.on('tileload', () => {
+    if (anyLoaded) return;
+    anyLoaded = true;
+    // Late-arriving tiles must CORRECT a premature failure message (rate
+    // limiters error a few tiles, then serve — the 2026-07-18 device pass).
+    // Otherwise: primary success clears the line; after a swap the
+    // "switched to …" note stays, so a topo map never looks unexplained.
+    if (deadSaid) tileSay(idx > 0 ? `${SOURCES[idx - 1].name} isn’t loading — switched to ${s.name}.` : '');
+    else if (idx === 0) tileSay('');
+  });
   layer.on('tileerror', () => {
     if (anyLoaded || swapped) return;
     errors++;
@@ -187,7 +194,8 @@ function addTileSource(map, L, idx) {
       map.removeLayer(layer);
       tileSay(`${s.name} isn’t loading — switched to ${SOURCES[idx + 1].name}.`);
       addTileSource(map, L, idx + 1);
-    } else {
+    } else if (!deadSaid) {
+      deadSaid = true;
       tileSay('No map tiles are loading — imagery may be blocked on this network. The bearing + distance form still works.');
     }
   });

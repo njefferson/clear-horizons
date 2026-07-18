@@ -1,7 +1,7 @@
 // Horizon Planner service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v34'; // app v2.6.2 — terrain tiles: OpenTopoMap auto-fallback, dedicated un-clobberable tile-status line, form grid
+const CACHE = 'horizon-v35'; // app v2.6.3 — map tiles bypass the SW (iOS opaque-piping breakage); late tiles correct a premature failure message
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',
@@ -60,6 +60,13 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(fetch(e.request).catch(() => caches.match('./index.html')));
     return;
   }
+  // Map tiles BYPASS the SW entirely: their responses are opaque (never
+  // cacheable by the 200s-only rule), so interception adds nothing — and
+  // piping opaque cross-origin images through a SW is a known iOS WebKit
+  // breakage vector (2026-07-18 device pass: production tiles failed with the
+  // SW in the path while Chromium rendered the same code perfectly).
+  if (url.hostname.endsWith('arcgisonline.com') || url.hostname.endsWith('.tile.opentopomap.org')) return;
+
   // Cross-origin Google Fonts (the IBM Plex faces — every number in the app):
   // their responses are opaque (res.ok is false), so the generic branch below
   // would never cache them and offline would lose the fonts entirely. Cache the

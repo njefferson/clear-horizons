@@ -481,6 +481,21 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.6.3 — 2026-07-18** (SW cache `horizon-v35`). **Terrain tiles, third
+  pass — take the service worker out of the tile path.** Noah's screenshot of
+  "tiny black lines" on the grey map was the tell: fragments of tiles WERE
+  rendering, so the pipeline works and something environmental eats most tile
+  loads. Headless Chromium screenshots the same code rendering perfectly
+  (256×256 tiles, correct geometry) — the failure is device-specific. In
+  production every tile is piped through the SW's stale-while-revalidate
+  intercept, which gains nothing for tiles (opaque → never cacheable by the
+  200s-only rule) and is a known iOS WebKit breakage vector for opaque
+  cross-origin images. Fix: tile hosts BYPASS the SW entirely (early return,
+  no respondWith). Also: a premature "no tiles loading" message now CORRECTS
+  itself when late tiles arrive (rate limiters error a few, then serve).
+  154 unit, 50 contrast, 24 smoke, 0 axe (34 scans). Decisive check is
+  Noah's phone; if still failing, next probe is staging-private (SW-free)
+  with v2.6.2+ to isolate the SW variable definitively.
 - **v2.6.2 — 2026-07-18** (SW cache `horizon-v34`). **Terrain tiles: stop
   betting on one provider.** Noah's second device pass DISPROVED v2.6.1's
   redirect theory: staging, private tab (no stale SW possible), "Site
