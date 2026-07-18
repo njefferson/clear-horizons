@@ -108,7 +108,7 @@ test('traceHorizon: a ray takes its MAX — near ground out-blocks a far ridge',
     if (southKm > 2) return 300;
     return 100;
   };
-  const t = await traceHorizon(SITE, 100, { fetchFn: terrainFetch(elevOf) });
+  const t = await traceHorizon(SITE, 100, { fetchFn: terrainFetch(elevOf), sleep: async () => {} });
   assert.equal(t.points.length, 36);
   const south = t.points.find((p) => p.az === 180);
   assert.ok(south.alt > 4 && south.alt < 6, `south alt ${south.alt} — the near hill, not the far ridge`);
@@ -119,17 +119,33 @@ test('traceHorizon: a ray takes its MAX — near ground out-blocks a far ridge',
   assert.ok(south.lat < SITE.lat && Number.isFinite(south.elev_m));
 });
 
-test('traceHorizon: batches survive one flaky call, fail closed on two', async () => {
+test('traceHorizon: 50-coord batches, backoff retries, named final failure', async () => {
+  const sleep = async () => {}; // injected — tests run instantly
+  // Healthy run: 864 samples → 18 batches of ≤50.
   let calls = 0;
-  const flakyOnce = async (url) => {
-    calls++;
-    if (calls === 3) throw new Error('blip'); // one mid-trace failure → retried
-    return terrainFetch(() => 100)(url);
-  };
-  const t = await traceHorizon(SITE, 100, { fetchFn: flakyOnce });
+  const counting = async (url) => { calls++; return terrainFetch(() => 100)(url); };
+  const t = await traceHorizon(SITE, 100, { fetchFn: counting, sleep });
   assert.equal(t.points.length, 36);
-  const alwaysFail = async () => { throw new Error('down'); };
-  await assert.rejects(() => traceHorizon(SITE, 100, { fetchFn: alwaysFail }), /down/);
+  assert.equal(calls, Math.ceil((360 / TRACE.azStep) * TRACE.samplesPerRay / TRACE.batchSize), '18 batches');
+
+  // A batch that fails twice then succeeds — the backoff attempts absorb it.
+  let n = 0;
+  const failTwice = async (url) => { n++; if (n <= 2) throw new Error('blip'); return terrainFetch(() => 100)(url); };
+  const t2 = await traceHorizon(SITE, 100, { fetchFn: failTwice, sleep });
+  assert.equal(t2.points.length, 36);
+
+  // Persistent 429 → fails closed with the REAL cause in the message.
+  const always429 = async () => ({ ok: false, status: 429 });
+  await assert.rejects(() => traceHorizon(SITE, 100, { fetchFn: always429, sleep }),
+    /failed after 3 tries \(elevation API 429\)/);
+
+  // Backoff actually waits between attempts (and paces between batches).
+  const waits = [];
+  const logSleep = async (ms) => { waits.push(ms); };
+  const failOnceEarly = (() => { let k = 0; return async (url) => { k++; if (k === 1) throw new Error('x'); return terrainFetch(() => 100)(url); }; })();
+  await traceHorizon(SITE, 100, { fetchFn: failOnceEarly, sleep: logSleep });
+  assert.equal(waits[0], TRACE.backoff_ms[0], 'first retry waits the first backoff');
+  assert.ok(waits.filter((w) => w === TRACE.pace_ms).length >= 10, 'batches are paced');
 });
 
 test('fetchElevations: batch URL + parsed metres, fails closed', async () => {

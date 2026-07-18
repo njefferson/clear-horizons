@@ -204,8 +204,10 @@ async function runTrace(nav) {
     toast(`Terrain horizon applied to ${site.name}.`, {
       action: { label: 'Undo', onClick: () => { saveSiteHorizon(site.id, before); say('Terrain horizon undone — previous profile restored.'); } },
     });
-  } catch {
-    say('The trace failed part-way — elevation service unreachable. Nothing was changed; try again when online.');
+  } catch (err) {
+    // Name the ACTUAL failure (HTTP status, shape, network) — a generic
+    // "unreachable" hides the diagnosis, the v2.6.x tile lesson.
+    say(`The trace failed part-way — ${err?.message || 'unknown error'}. Nothing was changed; try again.`);
   } finally {
     setProgress(null);
     if (tm) tm.tracing = false;

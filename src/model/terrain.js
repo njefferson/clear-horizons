@@ -97,7 +97,13 @@ export function applyPinsToProfile(profile, pins) {
 // per 10° ray, sample elevations at log-spaced distances (dense near, sparse
 // far), take the max apparent altitude, and note WHERE it came from (the
 // argmax point draws the "horizon ring" on the map).
-export const TRACE = { azStep: 10, minDist_m: 150, maxDist_m: 40000, samplesPerRay: 24 };
+export const TRACE = {
+  azStep: 10, minDist_m: 150, maxDist_m: 40000, samplesPerRay: 24,
+  batchSize: 50,               // half the documented 100 — shorter URLs, gentler
+  attempts: 3,                 // per batch, with real backoff between attempts
+  backoff_ms: [800, 2000],     // wait before attempt 2, then before attempt 3
+  pace_ms: 150,                // breather between successive batches
+};
 
 /** All sample points of a full trace: rays × log-spaced distances. */
 export function traceSamplePoints(site, T = TRACE) {
@@ -120,16 +126,23 @@ export function traceSamplePoints(site, T = TRACE) {
  * (0..1) is for a silent visual meter — announce start/done, not every tick.
  * @returns { points: [{ az, alt, dist_m, lat, lon, elev_m }, …] } 36 rays.
  */
-export async function traceHorizon(site, siteElev_m, { fetchFn, onProgress, T = TRACE } = {}) {
+export async function traceHorizon(site, siteElev_m, { fetchFn, onProgress, sleep, T = TRACE } = {}) {
+  const wait = sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
   const samples = traceSamplePoints(site, T);
   const elevs = new Array(samples.length);
-  for (let i = 0; i < samples.length; i += 100) {
-    const chunk = samples.slice(i, i + 100);
-    let got;
-    try { got = await fetchElevations(chunk, fetchFn); }
-    catch { got = await fetchElevations(chunk, fetchFn); } // one retry, then throw
+  const B = T.batchSize || 50;
+  for (let i = 0; i < samples.length; i += B) {
+    const chunk = samples.slice(i, i + B);
+    let got, lastErr;
+    for (let attempt = 0; attempt < (T.attempts || 3); attempt++) {
+      if (attempt > 0) await wait(T.backoff_ms?.[attempt - 1] ?? 1000); // real backoff, not an instant re-poke
+      try { got = await fetchElevations(chunk, fetchFn); lastErr = null; break; }
+      catch (e) { lastErr = e; }
+    }
+    if (lastErr) throw new Error(`elevation lookup failed after ${T.attempts || 3} tries (${lastErr.message || lastErr})`);
     for (let j = 0; j < got.length; j++) elevs[i + j] = got[j];
-    if (onProgress) onProgress(Math.min(1, (i + 100) / samples.length));
+    if (onProgress) onProgress(Math.min(1, (i + B) / samples.length));
+    if (i + B < samples.length && T.pace_ms) await wait(T.pace_ms); // politeness between batches
   }
   const best = new Map(); // az → sample with max apparent altitude
   samples.forEach((s, i) => {
@@ -154,7 +167,7 @@ export async function fetchElevations(points, fetchFn = typeof fetch !== 'undefi
   if (!res.ok) throw new Error(`elevation API ${res.status}`);
   const data = await res.json();
   if (!data || !Array.isArray(data.elevation) || data.elevation.length !== points.length) {
-    throw new Error('elevation API returned an unexpected shape');
+    throw new Error(`elevation API returned an unexpected shape (${data?.elevation?.length ?? 'none'} of ${points.length} values)`);
   }
   return data.elevation.map(Number);
 }

@@ -494,6 +494,21 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.7.1 — 2026-07-18** (SW cache `horizon-v37`). **Trace elevation calls:
+  resilience + honest diagnostics.** Device pass: the v2.7.0 trace failed
+  ("elevation service unreachable") while tiles + the single-point elevation
+  call worked; Open-Meteo's documented limits (100/batch, 10k/day) say our 9
+  batches were legal, and the real cause is UNVERIFIABLE from the sandbox
+  (Open-Meteo proxy-blocked) — so this release makes the client gentler and
+  the failure self-naming rather than guessing. Batches 100 → 50 (18 calls),
+  3 attempts each with real backoff (0.8 s / 2 s), 150 ms pacing between
+  batches; the status line now reports the ACTUAL error ("elevation API
+  429", shape mismatch with counts, or the network error's own words) — the
+  same clobbering-class lesson as the v2.6.x tile diagnostics. Apply still
+  fail-closed: the horizon only changes after every batch succeeds. Timing
+  is injectable, so the new backoff/pacing/failure-text unit tests run
+  instantly. 157 unit, 50 contrast, 24 smoke, 0 axe (34 scans). Noah's next
+  trace either works or names its blocker exactly.
 - **v2.7.0 — 2026-07-18** (SW cache `horizon-v36`). **Automatic 360°
   terrain-horizon trace** — Noah's device-pass insight retired the pin model:
   a pin measures one point's angle, but the horizon at a bearing is the MAX
