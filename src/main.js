@@ -14,6 +14,7 @@ import { renderSites } from './ui/sites.js';
 import { renderPolar } from './ui/polar.js';
 import { renderCapture } from './ui/capture.js';
 import { renderLiveCapture } from './ui/livecapture.js';
+import { renderSky } from './ui/sky.js';
 import { renderTargetDetail } from './ui/targetdetail.js';
 import { loadSites, requestPersistence, ensureDefaultSite } from './model/sites.js';
 import { maybeWelcome } from './ui/location.js';
@@ -108,6 +109,7 @@ function render(navigated = true, key = null) {
   const done = (p) => { (p && typeof p.then === 'function') ? p.then(after) : after(); };
   if (h.startsWith('#/target/')) return done(renderTargetDetail(app, state, nav)); // per-object details, no tab
   if (h.startsWith('#/targets')) return done(renderTargets(app, state, nav));
+  if (h.startsWith('#/sky')) return done(renderSky(app, state, nav)); // AR arcs-across-the-sky view (no tab; from Tonight)
   if (h.startsWith('#/capture/live')) return done(renderLiveCapture(app, state, nav)); // live-camera AR capture
   if (h.startsWith('#/capture')) return done(renderCapture(app, state, nav)); // sub-view of Horizon, no tab
   if (h.startsWith('#/horizon')) return done(renderHorizonEditor(app, state, nav));

@@ -334,6 +334,61 @@ await step('tonight: canvas paints, visibility row + effective window language',
   await shot('tonight.png');
 });
 
+await step('sky (AR): "View in sky" opens #/sky; camera overlay, Moon in the list, keyboard scrub, flat toggle', async () => {
+  // No real camera in headless — hand getUserMedia a canvas stream so the AR
+  // overlay path (video + overlay canvas + draw loop) runs end to end.
+  await page.evaluate(() => {
+    if (!navigator.mediaDevices) Object.defineProperty(navigator, 'mediaDevices', { value: {}, configurable: true });
+    navigator.mediaDevices.getUserMedia = async () => { const c = document.createElement('canvas'); c.width = 64; c.height = 64; return c.captureStream(1); };
+  });
+  await tab('Tonight');
+  await page.waitForSelector('.ng-sky');
+  await page.click('.ng-sky'); // the "View in sky" button on Tonight
+  await page.waitForFunction(() => location.hash.startsWith('#/sky'));
+  await page.waitForSelector('.lc-stage');
+  await page.waitForSelector('.lc-canvas'); // AR overlay canvas (not the flat fallback)
+  ok(!(await page.$('.sky-flat')), 'camera path taken (AR overlay, not the flat chart)');
+
+  // The Moon is always listed (Noah's requirement), with its phase; M42 was
+  // favourited earlier, so a favourite target is listed too. The list is the
+  // colour-independent, screen-reader channel.
+  const listText = await page.$eval('.sky-list', (e) => e.textContent);
+  ok(/Moon/.test(listText), `Moon appears in the sky list: ${listText.replace(/\s+/g, ' ').slice(0, 80)}`);
+  ok((await page.$$('.sky-li')).length >= 1, 'at least one object row in the sky list');
+
+  // Feed a synthetic Android orientation so the camera axis reads, then confirm
+  // the live (silent, non-aria-live) az/alt readout formats.
+  await page.evaluate(() => window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', { alpha: 180, beta: 135, gamma: 0, absolute: true })));
+  await page.waitForFunction(() => /pointing az \d+°/.test(document.querySelector('#sky-readout')?.textContent || ''));
+  const readout = await page.$eval('#sky-readout', (e) => e.textContent);
+  ok(/pointing az \d+° · alt -?\d+°/.test(readout), `live pointing readout present: ${readout}`);
+
+  // Hour scrubber is a native range with a keyboard path; arrow steps advance
+  // the clock and its aria-valuetext.
+  await page.focus('.sky-range');
+  const t0 = await page.$eval('#sky-time', (e) => e.textContent);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  const t1 = await page.$eval('#sky-time', (e) => e.textContent);
+  const vt = await page.$eval('.sky-range', (e) => e.getAttribute('aria-valuetext'));
+  ok(t0 !== t1 && /\d\d:\d\d/.test(t1), `keyboard scrub advanced the hour (${t0} → ${t1})`);
+  ok(/\d\d:\d\d/.test(vt), `range announces a clock time, not raw minutes: ${vt}`);
+
+  // Flat fallback toggle — the no-camera / desktop path renders the az/alt chart.
+  await page.click('#sky-mode');
+  await page.waitForSelector('.lc-stage.sky-flat');
+  await page.waitForSelector('.sky-flatcanvas');
+  const flatPainted = await page.evaluate(() => {
+    const c = document.querySelector('.sky-flatcanvas');
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] !== 0) return true;
+    return false;
+  });
+  ok(flatPainted, 'flat az/alt sky chart has pixels');
+  await shot('sky.png');
+  await page.evaluate(() => { location.hash = '#/'; }); // leave → camera tears down
+});
+
 await step('settings: custom scope — live FOV preview, save, active, remove', async () => {
   await tab('Settings');
   await page.waitForSelector('.inst-card'); // hashchange renders async — wait, don't race
@@ -408,7 +463,7 @@ await step('no view overflows the page width at phone size (iPhone 12/13/14)', a
     for (const el of document.querySelectorAll('#app, #app *')) max = Math.max(max, Math.ceil(el.getBoundingClientRect().right));
     return max - window.innerWidth;
   });
-  for (const [label, hash] of [['Capture', '#/capture'], ['Live capture', '#/capture/live']]) {
+  for (const [label, hash] of [['Capture', '#/capture'], ['Live capture', '#/capture/live'], ['Sky', '#/sky']]) {
     await page.evaluate((h) => { location.hash = h; }, hash);
     await page.waitForTimeout(200);
     const over = await edgeOver();

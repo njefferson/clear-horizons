@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const css = readFileSync(ROOT + 'src/styles.css', 'utf8');
 const ng = readFileSync(ROOT + 'src/ui/nightgraph.js', 'utf8');
+const marks = readFileSync(ROOT + 'src/ui/marks.js', 'utf8'); // shared series palette + casing
 
 // --- parse -------------------------------------------------------------------
 function tokenBlock(selector) {
@@ -31,10 +32,11 @@ function tokenBlock(selector) {
 const light = tokenBlock(':root');
 const dark = { ...light, ...tokenBlock('[data-theme="dark"]') }; // dark overrides light
 
-// Graph constants from nightgraph.js (hex only).
-const SERIES = JSON.parse((ng.match(/const SERIES = (\[[^\]]*\])/) || [])[1].replace(/'/g, '"'));
+// Categorical palette + casing now live in the shared ui/marks.js (used by both
+// the night graph and the AR sky view); axis/moon-path stay graph-local.
+const SERIES = JSON.parse((marks.match(/export const SERIES = (\[[^\]]*\])/) || [])[1].replace(/'/g, '"'));
+const CASE = (marks.match(/export const CASE = '([^']+)'/) || [])[1]; // dark casing under every curve pixel
 const NIGHT = '#0d1018';           // darkest twilight band / ng-wrap background
-const CASE = (ng.match(/const CASE = '([^']+)'/) || [])[1]; // dark casing under every curve pixel
 const AXIS = (ng.match(/AXIS = '([^']+)'/) || [])[1];
 const MOON = (ng.match(/MOON = '([^']+)'/) || [])[1];
 

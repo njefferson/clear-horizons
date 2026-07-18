@@ -229,3 +229,22 @@ export function altitudeCurve(target, observer, start, end, stepMinutes = 5, opt
   }
   return out;
 }
+
+/**
+ * The Moon's alt/az path from start to end — the same shape altitudeCurve
+ * returns, so the sky view can draw the Moon's arc exactly like a target's. The
+ * Moon is a Body (not an { ra, dec } target), so it can't go through
+ * altitudeCurve; this samples moonAltAz instead.
+ * @returns [{ time: Date, altitude, azimuth }] inclusive of both ends.
+ */
+export function moonCurve(observer, start, end, stepMinutes = 5, opts = {}) {
+  const out = [];
+  const t0 = new Date(start).getTime();
+  const t1 = new Date(end).getTime();
+  const step = stepMinutes * 60000;
+  for (let ms = t0; ms <= t1 + 1; ms += step) {
+    const d = new Date(ms);
+    out.push({ time: d, ...moonAltAz(observer, d, opts) });
+  }
+  return out;
+}

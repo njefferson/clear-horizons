@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   makeObserver, altAz, sunAltAz, moonInfo, twilightBand, twilightAt,
-  riseSet, transit, altitudeCurve, separationDeg, moonSeparation, TWILIGHT,
+  riseSet, transit, altitudeCurve, moonCurve, moonAltAz, separationDeg, moonSeparation, TWILIGHT,
 } from '../src/model/astro.js';
 import * as Astronomy from '../src/vendor/astronomy.js';
 
@@ -135,4 +135,17 @@ test('altitudeCurve: inclusive endpoints, right cadence, values match altAz', ()
   const direct = altAz(VEGA, obs, mid.time);
   near(mid.altitude, direct.altitude, 1e-9, 'curve altitude matches altAz');
   near(mid.azimuth, direct.azimuth, 1e-9, 'curve azimuth matches altAz');
+});
+
+test('moonCurve: inclusive endpoints, right cadence, values match moonAltAz', () => {
+  const start = new Date('2026-03-20T04:00:00Z');
+  const end = new Date('2026-03-20T07:00:00Z');
+  const curve = moonCurve(obs, start, end, 30);
+  assert.equal(curve.length, 7, '3h at 30-min steps, inclusive = 7 samples');
+  assert.equal(curve[0].time.getTime(), start.getTime());
+  assert.equal(curve[curve.length - 1].time.getTime(), end.getTime());
+  const mid = curve[3];
+  const direct = moonAltAz(obs, mid.time);
+  near(mid.altitude, direct.altitude, 1e-9, 'moon curve altitude matches moonAltAz');
+  near(mid.azimuth, direct.azimuth, 1e-9, 'moon curve azimuth matches moonAltAz');
 });
