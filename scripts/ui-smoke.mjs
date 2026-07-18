@@ -155,6 +155,11 @@ await step('horizon editor: 36 handles; keyboard nudge writes through', async ()
   const readout = await page.$eval('.hz-readout', (e) => e.textContent);
   ok(/0° · 3°/.test(readout), `readout after 3 nudges: ${readout}`);
   ok(await page.$eval('.hz-handle[data-i="0"]', (e) => e.getAttribute('aria-valuenow')) === '3', 'slider exposes aria-valuenow=3');
+  // Depressed horizons: the editor now records and shows below 0° (downhill).
+  for (let k = 0; k < 8; k++) await page.keyboard.press('ArrowDown'); // 3 → -5
+  ok(await page.$eval('.hz-handle[data-i="0"]', (e) => Number(e.getAttribute('aria-valuenow'))) === -5, 'handle edits below 0° (depressed horizon)');
+  ok(await page.$eval('.hz-handle[data-i="0"]', (e) => e.getAttribute('aria-valuemin')) === '-60', 'slider range extends below 0°');
+  for (let k = 0; k < 5; k++) await page.keyboard.press('ArrowUp'); // back to 0 for downstream steps
 });
 
 await step('horizon editor: Stellarium import (keeps the file\'s density)', async () => {

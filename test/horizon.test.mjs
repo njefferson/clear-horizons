@@ -62,9 +62,11 @@ test('setAltitudeAt replaces stored points within ±STEP/2 of the row (wrap-awar
   setAltitudeAt(p, 9, 25); // row 9 = 90° — claims [85, 95]
   assert.equal(sampleAt(p, 90), 25);
   assert.deepEqual(p.points.map((q) => q.az), [90, 96, 200], 'only 96° and 200° survive nearby');
-  // Manual edits clamp to the editor range [0, 90] — no negative drags.
+  // Manual edits may go below 0° (downhill/depressed horizons), floored at ALT_MIN.
   setAltitudeAt(p, 0, -10);
-  assert.equal(sampleAt(p, 0), 0);
+  assert.equal(sampleAt(p, 0), -10);
+  setAltitudeAt(p, 0, -999);
+  assert.equal(sampleAt(p, 0), ALT_MIN, 'a huge downward drag floors at ALT_MIN, not 0');
   // Wrap-aware claim: a point at 357° belongs to row 0 (north).
   const q = makeHorizon([[357, 6]]);
   setAltitudeAt(q, 0, 3);

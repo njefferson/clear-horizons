@@ -354,8 +354,17 @@ tools:**
   rectangle (+ mosaic grid) over the object thumbnail. Presets ship in
   `data/instruments.js`; customs persist in `horizon.instruments` and
   export/import with sites so they aren't trapped in one browser.
-- **Weather overlay** — Open-Meteo cloud cover shaded behind the night graph on the
-  same time axis, then 7Timer seeing/transparency. Cache per site/night.
+- **Weather overlay (Astroweather)** — Noah wants it UNDER the night graph,
+  aligned to the same hour axis: Open-Meteo hourly cloud cover (total/low/mid/
+  high) shaded per hour beneath the curves, then 7Timer seeing/transparency.
+  Cache per site/night. Keyless + CORS-friendly. (Device ask, 2026-07-18.)
+- **AR sky view with an hour scrubber (Noah: "the last missing piece")** — the
+  time-vs-altitude graph can't show an object's ARC across the sky (its az/alt
+  path). Wanted: an augmented-reality / planetarium view that shows where each
+  target sits in the sky, with a slider to step through each hour of the night
+  and watch it move. Reuse: model/arproject.js (world az/alt → screen) already
+  does the projection maths; altAz over the night gives the path; the night
+  graph's scrub pattern is the hour selector. Big feature — its own pass.
 - **Thumbnails + object details** — STARTED (first cut, `staging`): `model/
   thumbnails.js` builds a CDS hips2fits DSS2-colour cutout URL per object (RA
   hours→deg, FOV framed to the object). A small preview image sits on each

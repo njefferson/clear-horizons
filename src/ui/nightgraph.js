@@ -26,8 +26,10 @@ const M = { l: 32, r: 12, t: 12, b: 24 };
 const ALT_MAX = 90;
 const STEP_MIN = 4;               // sampling cadence for the curves
 
-// Fixed night-sky palette (the graph is a dark viz in both app themes).
-const BAND = { day: '#3a4a63', civil: '#2c3a54', nautical: '#20293f', astronomical: '#161c2e', night: '#0d1018' };
+// Fixed night-sky palette (the graph is a dark viz in both app themes). The
+// twilight ramp stays BLUE all the way down — deepest night is a deep navy,
+// not black, like a real dark sky.
+const BAND = { day: '#2e4a72', civil: '#243c5e', nautical: '#1b2e4c', astronomical: '#13233d', night: '#0d1b31' };
 const AXIS = '#8a93ad', GRID = 'rgba(160,170,200,.14)', MOON = '#cfd6e6';
 // Colour-blind-safe categorical order (accessibility standing order). Validated
 // against the graph surface #0d1018 with the dataviz CVD validator — PASS on
@@ -39,8 +41,8 @@ const SERIES = ['#3987e5', '#008300', '#d55181', '#c98500', '#199e70', '#d95926'
 // marker shape, drawn on the curve and mirrored in the legend, table and scrub.
 const MARKS = ['circle', 'square', 'triangle', 'diamond', 'plus', 'cross', 'downtri', 'pentagon'];
 const CASE = '#0d1018';           // dark casing stroked under bright curve runs
-const BLOCKED = '#8a93ad';        // up-but-behind-your-horizon runs: neutral grey (+ dashed,
-                                  // so "blocked" never rides on colour alone)
+const BLOCKED = '#5f6b84';        // up-but-behind-your-horizon runs: a DIM slate grey (+ dashed,
+                                  // so "blocked" never rides on colour alone) — recessive, not loud
 const MAX_TARGETS = 8;
 const seriesMark = (i) => MARKS[i % MARKS.length];
 

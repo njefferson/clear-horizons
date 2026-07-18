@@ -7,19 +7,21 @@
 import { el, clear, toast } from './dom.js';
 import {
   N, azForIndex, indexForAz, setAltitudeAt, sampleAt, maxAltitude,
-  makeHorizon, toStellarium, fromStellarium,
+  makeHorizon, toStellarium, fromStellarium, ALT_MIN, ALT_MAX,
 } from '../model/horizon.js';
 import { activeSite, saveSiteHorizon } from '../model/sites.js';
 
-// Plot geometry (SVG user units). Altitude grows upward; azimuth left→right.
+// Plot geometry (SVG user units). Altitude grows upward; azimuth left→right. The
+// altitude axis spans ALT_MIN…ALT_MAX so DEPRESSED horizons (downhill, low
+// obstructions below eye level) are drawn and editable, not clamped at 0°.
 const VB = { w: 720, h: 250 };
 const M = { l: 30, r: 10, t: 10, b: 26 };
 const PW = VB.w - M.l - M.r;
 const PH = VB.h - M.t - M.b;
-const ALT_MAX = 90;
+const ALT_SPAN = ALT_MAX - ALT_MIN;
 
 const xOf = (az) => M.l + (az / 360) * PW;
-const yOf = (alt) => M.t + (1 - alt / ALT_MAX) * PH;
+const yOf = (alt) => M.t + (1 - (alt - ALT_MIN) / ALT_SPAN) * PH;
 const CARDINALS = [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W'], [360, 'N']];
 
 // 8-point compass label for an azimuth — used in the slider handles' spoken value.
@@ -55,8 +57,9 @@ export function renderHorizonEditor(app, state, nav) {
   const mk = (tag, attrs) => { const n = document.createElementNS(svgns, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
 
   // Gridlines + labels ------------------------------------------------------
-  for (const alt of [0, 30, 60, 90]) {
-    svg.append(mk('line', { x1: M.l, y1: yOf(alt), x2: VB.w - M.r, y2: yOf(alt), class: 'hz-grid' }));
+  for (const alt of [-60, -30, 0, 30, 60, 90]) {
+    // The 0° line (true horizon) is emphasised: obstruction above it, downhill below.
+    svg.append(mk('line', { x1: M.l, y1: yOf(alt), x2: VB.w - M.r, y2: yOf(alt), class: alt === 0 ? 'hz-grid hz-grid-zero' : 'hz-grid' }));
     const al = mk('text', { x: 2, y: yOf(alt) + 3, class: 'hz-axlabel' });
     al.textContent = `${alt}°`; svg.append(al);
   }
@@ -75,7 +78,7 @@ export function renderHorizonEditor(app, state, nav) {
   for (let i = 0; i < N; i++) {
     const h = mk('circle', {
       r: 6, class: 'hz-handle', 'data-i': i, tabindex: 0,
-      role: 'slider', 'aria-valuemin': 0, 'aria-valuemax': 90,
+      role: 'slider', 'aria-valuemin': ALT_MIN, 'aria-valuemax': ALT_MAX,
       'aria-label': `Obstruction altitude ${dirLabel(azForIndex(i))} (${azForIndex(i)}°)`,
     });
     handles.push(h); svg.append(h);
@@ -91,18 +94,18 @@ export function renderHorizonEditor(app, state, nav) {
 
   function redraw() {
     // The curve samples the profile finely (2°) so captured/imported detail
-    // between the 36 handles is visible; below-0° stretches clip to the plot
-    // floor (the editor's drag range stays 0–90).
+    // between the 36 handles is visible, including any below-0° (depressed)
+    // stretches. The obstruction fill runs from the skyline down to the floor.
     let d = '';
     for (let az = 0; az <= 360; az += 2) {
-      const alt = Math.max(0, sampleAt(profile, az));
+      const alt = sampleAt(profile, az);
       d += `${az ? 'L' : 'M'}${xOf(az).toFixed(1)} ${yOf(alt).toFixed(1)} `;
     }
     line.setAttribute('d', d);
-    area.setAttribute('d', `${d}L${xOf(360).toFixed(1)} ${yOf(0)} L${xOf(0).toFixed(1)} ${yOf(0)} Z`);
+    area.setAttribute('d', `${d}L${xOf(360).toFixed(1)} ${yOf(ALT_MIN)} L${xOf(0).toFixed(1)} ${yOf(ALT_MIN)} Z`);
     for (let i = 0; i < N; i++) {
       handles[i].setAttribute('cx', xOf(azForIndex(i)));
-      handles[i].setAttribute('cy', yOf(Math.max(0, sampleAt(profile, azForIndex(i)))));
+      handles[i].setAttribute('cy', yOf(sampleAt(profile, azForIndex(i))));
       setHandleValue(i);
     }
     header.querySelector('.hz-max').textContent = `tallest ${maxAltitude(profile).toFixed(0)}°`;
@@ -112,8 +115,8 @@ export function renderHorizonEditor(app, state, nav) {
   function altFromEvent(e) {
     const r = svg.getBoundingClientRect();
     const svgY = ((e.clientY - r.top) / r.height) * VB.h;
-    const alt = (1 - (svgY - M.t) / PH) * ALT_MAX;
-    return Math.max(0, Math.min(ALT_MAX, alt));
+    const alt = ALT_MIN + (1 - (svgY - M.t) / PH) * ALT_SPAN;
+    return Math.max(ALT_MIN, Math.min(ALT_MAX, alt));
   }
   function indexFromEvent(e) {
     const r = svg.getBoundingClientRect();

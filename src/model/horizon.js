@@ -23,7 +23,6 @@ export const ALT_MIN = -60;      // depressed horizons (hilltops, downhill, low
 export const ALT_MAX = 90;
 
 const clampAlt = (a) => Math.max(ALT_MIN, Math.min(ALT_MAX, a));
-const clampManual = (a) => Math.max(0, Math.min(ALT_MAX, a));
 const norm360 = (az) => ((az % 360) + 360) % 360;
 const round2 = (x) => Math.round(x * 100) / 100;
 
@@ -88,7 +87,7 @@ export function setAltitudeAt(profile, i, altitude) {
   const half = STEP / 2;
   const dist = (p) => { const d = Math.abs(p.az - az); return Math.min(d, 360 - d); };
   const kept = profile.points.filter((p) => dist(p) > half);
-  kept.push({ az, alt: clampManual(altitude) });
+  kept.push({ az, alt: clampAlt(altitude) }); // manual edits may go below 0° (downhill/depressed horizons)
   kept.sort((a, b) => a.az - b.az);
   profile.points = kept;
   return profile;

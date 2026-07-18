@@ -277,6 +277,8 @@ a { color: var(--accent-ink); } /* accent-ink, not --accent: links must clear 4.
 .hz-svg { width: 100%; min-width: 480px; height: auto; display: block; touch-action: none;
   background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 .hz-grid { stroke: var(--line); stroke-width: 1; }
+/* The 0° line is the true horizon: obstruction above, downhill below. */
+.hz-grid-zero { stroke: var(--dim); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .hz-axlabel, .hz-azlabel { fill: var(--dim); font-family: var(--mono); font-size: 11px; }
 .hz-area { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: none; }
 .hz-line { fill: none; stroke: var(--accent); stroke-width: 2; }
