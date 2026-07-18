@@ -5,6 +5,53 @@ the reuse map from Noah's existing repos, settled decisions, and the roadmap.
 Structure mirrors the two sibling apps (Bird-location-scouting, Jefferson-
 Photography-Studio): free, on-device, offline-first PWA on Cloudflare Pages.
 
+## ⭐ NEXT SESSION — AR "arcs across the sky" view (START HERE)
+Noah is building this next: an augmented-reality / planetarium view that shows
+where each target sits in the sky and its ARC over the night, with an hour
+scrubber to step through the night and watch it move. This is "the last missing
+piece" the flat time-vs-altitude graph on Tonight can't show.
+
+**Everything needed already exists — this is assembly, not new physics:**
+- `model/arproject.js` — world (az/alt) → screen projection AND the inverses,
+  built for the live-camera overlay. Point the phone at the sky, project each
+  target onto the camera image at its current (or scrubbed-hour) az/alt.
+- `model/astro.js altitudeCurve(target, observer, start, end, step)` — gives a
+  target's (time → alt, az) path over the night; that IS the arc. `altAz()` for
+  a single instant (the scrubbed hour).
+- `model/geomag.js declination()` — correct the phone heading to true north
+  (see the COMPASS note below — same magnetic-vs-true question applies here).
+- `ui/livecapture.js` — the working getUserMedia + orientation + canvas-overlay
+  harness to fork from (camera stream, iOS motion-permission tap, reticle,
+  draw loop). `ui/nightgraph.js` — the scrub/hour-cursor pattern + the twilight
+  bands + horizon-cut visibility logic to reuse for the hour selector.
+- Cut each arc by the measured horizon exactly as Tonight does (only draw where
+  `isAbove(profile, az, alt)`), so AR and graph agree.
+Likely new route `#/sky` (or a mode inside live capture). Device-only feel is
+NEEDS-HIS-HANDS; keep a no-AR fallback (a flat az/alt sky chart) for desktop.
+
+## COMPASS: magnetic vs true, and can we detect the phone? (settled 2026-07-18)
+Q (Noah): can't we detect the phone model and know whether its compass is
+already true-north? **Short answer: no — and the model wouldn't help.**
+- iOS hides the specific model: every iPhone reports a generic "iPhone" UA
+  (Apple policy). Android UA/Client-Hints CAN give a model string, but it's
+  being frozen/reduced and gated behind high-entropy hints.
+- More important: magnetic-vs-true is a property of the **browser API**, not the
+  hardware. Knowing "iPhone 15" tells you nothing about what the API returns.
+- What we CAN reliably detect: the PLATFORM (iOS vs Android) from the UA, and
+  which orientation event fired (`deviceorientationabsolute` vs iOS
+  `webkitCompassHeading`).
+- Known API behaviour: **Android `deviceorientationabsolute` α = MAGNETIC
+  north** (geomagnetic rotation sensor) → applying WMM declination is CORRECT.
+  **iOS `webkitCompassHeading` is AMBIGUOUS** across iOS versions — some builds
+  already return a true-north-corrected heading (CoreLocation applies
+  declination), which would mean we double-correct by one declination on iOS.
+- RESOLUTION (a NEEDS-HIS-HANDS test, do on a real iPhone): stand on a known
+  true bearing (e.g. a surveyed street grid or a distant landmark whose true
+  azimuth you compute), read `webkitCompassHeading`, and see whether it already
+  matches TRUE (skip declination on iOS) or MAGNETIC (keep it). Until then we
+  apply declination on all platforms and expose a manual override. If iOS turns
+  out to be pre-corrected, branch on `source === 'ios'` in capture to skip it.
+
 ## Product thesis — synergy + one new capability
 Every individual feature already exists free (Telescopius = catalog/curves/
 thumbnails AND a manual per-location custom horizon with CSV import — see
