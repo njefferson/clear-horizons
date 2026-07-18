@@ -8,9 +8,9 @@
 // site — and unifies that with everything else the planner knows.
 //
 // This is the pure-math core (100% headless-testable): where the pole is, where
-// the pole star sits, its live reticle clock position, and pole/star visibility
-// against the measured horizon. The device-only "point to the pole" live aid
-// (DeviceOrientation + compass) is a separate roadmap item.
+// the pole star sits, its live reticle clock position, pole/star visibility
+// against the measured horizon, and the aim-error math behind the live
+// "point to the pole" aid (ui/polaraim.js).
 //
 // Reticle convention: a **correct-image, naked-eye** view looking at the pole,
 // 12 o'clock = straight up (toward the zenith). At the pole star's upper transit
@@ -75,6 +75,61 @@ function reticleFromHourAngle(hourAngle, north) {
  *   usable                                                     // pole clears horizon & is up
  * }
  */
+// --- live "point to the pole" aim math (ui/polaraim.js) ----------------------
+// Hysteresis pair for the on-target state: acquire inside ENTER, hold until the
+// error exceeds EXIT — the announcement can't chatter at the boundary.
+export const AIM_ENTER_DEG = 2.0;
+export const AIM_EXIT_DEG = 3.0;
+
+const wrap180 = (d) => { let x = ((d % 360) + 360) % 360; return x > 180 ? x - 360 : x; };
+
+/**
+ * How far the camera axis is from an aim point, and which way to move.
+ * @param cam { az, alt } — where the camera points (true-north azimuth)
+ * @param aim { azimuth, altitude } — the target (e.g. polarAlignment().pole)
+ * @returns { dAz, dAlt, separationDeg }
+ *   dAz  ∈ (−180,180]: + = the aim point is to the RIGHT of where you point
+ *   dAlt: + = the aim point is ABOVE where you point
+ *   separationDeg: small-angle great-circle distance (azimuth difference scaled
+ *   by cos of the mid altitude — exact enough near alt≈lat where this is used)
+ */
+export function aimError(cam, aim) {
+  const dAz = wrap180(aim.azimuth - cam.az);
+  const dAlt = aim.altitude - cam.alt;
+  const midAlt = ((aim.altitude + cam.alt) / 2) * (Math.PI / 180);
+  const separationDeg = Math.hypot(dAz * Math.cos(midAlt), dAlt);
+  return { dAz, dAlt, separationDeg };
+}
+
+/**
+ * Human guidance from an aimError, with hysteresis. `wasOnTarget` is the
+ * previous frame's onTarget so a lock is sticky (ENTER to acquire, EXIT to lose).
+ * @returns { onTarget, text } — text like "34° right · 12° up" or "on target"
+ */
+export function aimGuidance(err, wasOnTarget = false) {
+  const onTarget = err.separationDeg <= (wasOnTarget ? AIM_EXIT_DEG : AIM_ENTER_DEG);
+  if (onTarget) return { onTarget, text: 'on target' };
+  const part = (v, pos, neg) => `${Math.abs(v) < 10 ? Math.abs(v).toFixed(1) : Math.round(Math.abs(v))}° ${v >= 0 ? pos : neg}`;
+  return { onTarget, text: `${part(err.dAz, 'right', 'left')} · ${part(err.dAlt, 'up', 'down')}` };
+}
+
+/**
+ * The pole star's daily small circle around the pole, as az/alt points ready
+ * for projection: angular radius `radiusDeg`, azimuth spread widened by
+ * 1/cos(alt) so the circle projects round through the equirectangular map.
+ */
+export function poleCirclePoints(pole, radiusDeg, n = 36) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const th = (i / n) * 2 * Math.PI;
+    const alt = pole.altitude + radiusDeg * Math.cos(th);
+    const cosAlt = Math.max(0.05, Math.cos(alt * (Math.PI / 180)));
+    const az = ((pole.azimuth + (radiusDeg * Math.sin(th)) / cosAlt) % 360 + 360) % 360;
+    pts.push({ az, alt });
+  }
+  return pts;
+}
+
 export function polarAlignment(site, date) {
   const lat = clampLat(site.lat);
   const north = lat >= 0;

@@ -492,6 +492,44 @@ await step('polar align: aim card renders from the site, horizon-aware', async (
   await shot('polar.png');
 });
 
+await step('polar aim: hero opens #/polar/aim; guidance readout, then ON TARGET announces', async () => {
+  // Same mocked camera as the sky step (re-set in case of an earlier reload).
+  await page.evaluate(() => {
+    if (!navigator.mediaDevices) Object.defineProperty(navigator, 'mediaDevices', { value: {}, configurable: true });
+    navigator.mediaDevices.getUserMedia = async () => { const c = document.createElement('canvas'); c.width = 64; c.height = 64; return c.captureStream(1); };
+  });
+  await page.click('.ng-sky-hero'); // "Point to the pole" hero on the Polar tab
+  await page.waitForFunction(() => location.hash.startsWith('#/polar/aim'));
+  await page.waitForSelector('.lc-canvas');
+  ok(!(await page.$('.lc-stage.lc-nocam')), 'camera path taken (not the numbers fallback)');
+  ok(await page.$eval('#aim-cta', (e) => !e.hidden), 'compass cue shown before any compass fix');
+
+  // Point well away from the pole (due south, 10° up) → directional guidance in
+  // the silent readout, and the compass cue dismisses now that the axis reads.
+  const dispatch = (alpha, beta) => page.evaluate(({ alpha, beta }) => window.dispatchEvent(
+    new DeviceOrientationEvent('deviceorientationabsolute', { alpha, beta, gamma: 0, absolute: true })), { alpha, beta });
+  await dispatch(180, 100);
+  await page.waitForFunction(() => /pole: .*° (left|right) · .*° (up|down) · off by/.test(document.querySelector('#aim-readout')?.textContent || ''));
+  ok(await page.$eval('#aim-cta', (e) => e.hidden), 'compass cue hidden once the axis reads');
+
+  // Compute the lock-on orientation FROM THE PAGE (declination from the readout,
+  // pole altitude from the explainer) — no hard-coded WMM values to go stale.
+  // Camera model: heading = (360 − α) % 360, altitude = β − 90; true az =
+  // magnetic az + declination, so α = declination aims at true north.
+  const { decl, poleAlt } = await page.evaluate(() => {
+    const m = (document.querySelector('#aim-readout')?.textContent || '').match(/\(([+-][\d.]+)° decl\)/);
+    const a = (document.querySelector('.lc-controls')?.textContent || '').match(/latitude \(([\d.]+)°\)/);
+    return { decl: m ? Number(m[1]) : null, poleAlt: a ? Number(a[1]) : null };
+  });
+  ok(decl != null && poleAlt != null, `page carries declination (${decl}) and pole altitude (${poleAlt})`);
+  await dispatch(((decl % 360) + 360) % 360, 90 + poleAlt);
+  await page.waitForFunction(() => /ON TARGET ✓/.test(document.querySelector('#aim-readout')?.textContent || ''));
+  ok(/On target/.test(await page.$eval('#aim-hint', (e) => e.textContent)), 'lock announced via the role=status node (discrete, not per-frame)');
+  await shot('polar-aim.png');
+  await page.evaluate(() => { location.hash = '#/polar'; }); // leave → camera tears down
+  await page.waitForSelector('.pa-dial');
+});
+
 await step('about: credits visible, scaffold copy gone', async () => {
   await page.click('#about-btn');
   await page.waitForSelector('.about-dialog');
@@ -536,7 +574,7 @@ await step('no view overflows the page width at phone size (iPhone 12/13/14)', a
     for (const el of document.querySelectorAll('#app, #app *')) max = Math.max(max, Math.ceil(el.getBoundingClientRect().right));
     return max - window.innerWidth;
   });
-  for (const [label, hash] of [['Capture', '#/capture'], ['Live capture', '#/capture/live'], ['Sky', '#/sky']]) {
+  for (const [label, hash] of [['Capture', '#/capture'], ['Live capture', '#/capture/live'], ['Sky', '#/sky'], ['Polar aim', '#/polar/aim']]) {
     await page.evaluate((h) => { location.hash = h; }, hash);
     await page.waitForTimeout(200);
     const over = await edgeOver();

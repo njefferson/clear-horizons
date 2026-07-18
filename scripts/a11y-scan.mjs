@@ -61,7 +61,7 @@ const SEED = {
 
 const VIEWS = [
   ['Tonight', '#/'], ['Targets', '#/targets'], ['Horizon', '#/horizon'],
-  ['Polar', '#/polar'], ['Sites', '#/sites'], ['Settings', '#/settings'], ['Capture', '#/capture'],
+  ['Polar', '#/polar'], ['Polar aim', '#/polar/aim'], ['Sites', '#/sites'], ['Settings', '#/settings'], ['Capture', '#/capture'],
   ['Live capture', '#/capture/live'], ['Sky', '#/sky'], ['Target detail', '#/target/NGC1952'],
 ];
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
@@ -139,4 +139,4 @@ if (violations.length) {
   }
   process.exit(1);
 }
-console.log(`\naxe: 0 violations across ${scanned} scans (10 views + 5 dialogs × 2 themes), WCAG 2.2 A/AA.`);
+console.log(`\naxe: 0 violations across ${scanned} scans (11 views + 5 dialogs × 2 themes), WCAG 2.2 A/AA.`);

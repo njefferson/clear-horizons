@@ -5,30 +5,20 @@ the reuse map from Noah's existing repos, settled decisions, and the roadmap.
 Structure mirrors the two sibling apps (Bird-location-scouting, Jefferson-
 Photography-Studio): free, on-device, offline-first PWA on Cloudflare Pages.
 
-## ⭐ NEXT SESSION — AR "arcs across the sky" view (START HERE)
-Noah is building this next: an augmented-reality / planetarium view that shows
-where each target sits in the sky and its ARC over the night, with an hour
-scrubber to step through the night and watch it move. This is "the last missing
-piece" the flat time-vs-altitude graph on Tonight can't show. **This is the next
-MAJOR version — v2.0.0** (bump package.json accordingly when it lands).
-
-**Everything needed already exists — this is assembly, not new physics:**
-- `model/arproject.js` — world (az/alt) → screen projection AND the inverses,
-  built for the live-camera overlay. Point the phone at the sky, project each
-  target onto the camera image at its current (or scrubbed-hour) az/alt.
-- `model/astro.js altitudeCurve(target, observer, start, end, step)` — gives a
-  target's (time → alt, az) path over the night; that IS the arc. `altAz()` for
-  a single instant (the scrubbed hour).
-- `model/geomag.js declination()` — correct the phone heading to true north
-  (see the COMPASS note below — same magnetic-vs-true question applies here).
-- `ui/livecapture.js` — the working getUserMedia + orientation + canvas-overlay
-  harness to fork from (camera stream, iOS motion-permission tap, reticle,
-  draw loop). `ui/nightgraph.js` — the scrub/hour-cursor pattern + the twilight
-  bands + horizon-cut visibility logic to reuse for the hour selector.
-- Cut each arc by the measured horizon exactly as Tonight does (only draw where
-  `isAbove(profile, az, alt)`), so AR and graph agree.
-Likely new route `#/sky` (or a mode inside live capture). Device-only feel is
-NEEDS-HIS-HANDS; keep a no-AR fallback (a flat az/alt sky chart) for desktop.
+## ⭐ CURRENT STATE (updated 2026-07-18, post-v2.3.0)
+The AR sky view that used to headline this block SHIPPED as v2.0.0; weather
+shipped as v2.1.0/v2.2.0; the polar "point to the pole" live aid as v2.3.0.
+What's next, in rough order:
+- **NEEDS-HIS-HANDS backlog (Noah, on a phone/iPad):** the v1.1 on-device
+  checklist item below is still open, plus every device pass since — capture
+  feel/compass drift, AR sky framing, and now the polar-aim lock feel
+  (marker stability at steep tilt, hysteresis feel, treeline warning at a real
+  blocked-north site). `staging` == `main`, so testing production is fine.
+- **Remote-buildable roadmap next-ups:** offline thumbnail precache (the
+  stated "still to come" half of the details page), instrument preset library
+  (Dwarf/Vespera + sensor-mm entry), map-pin terrain horizon (the big one).
+- **Repo metadata:** confirm the GitHub About fields and re-upload the v2.0.2
+  og-image as the social preview (see CLAUDE.md — manual, needs confirmation).
 
 ## COMPASS: magnetic vs true, and can we detect the phone? (settled 2026-07-18)
 Q (Noah): can't we detect the phone model and know whether its compass is
@@ -394,9 +384,10 @@ tools:**
   - **Horizon-aware** — the novel part vs. Polar Scope Align / PS Align Pro (which
     already nail the reticle for free): use the site horizon mask to warn when the
     pole is **behind the north treeline** from this site.
-  - **"Point to the pole" live aid** reusing the sensor-trace DeviceOrientation +
-    compass-calibration stack. Framed for **S50 EQ mode** (aim the tripod tilt axis
-    at the NCP for longer exposures).
+  - **"Point to the pole" live aid** — SHIPPED v2.3.0 (`ui/polaraim.js`,
+    `#/polar/aim`): live camera + compass guidance onto the NCP/SCP with an
+    on-target lock, framed for **S50 EQ mode** (aim the tripod tilt axis at the
+    pole for longer exposures). Aim-error math in `model/polar.js`.
 - **Multi-instrument + custom sensor** (the instrument model is built in v1; this is
   the fuller UX on top): a preset library (S30, Dwarf II/3, Vespera, …) plus a
   **custom-scope editor** (enter focal length + sensor mm or px + pixel size → FOV)
@@ -478,11 +469,28 @@ tools:**
   Promise predicates; a Promise is truthy, so such a poll "passes" instantly).
 - **NEEDS-HIS-HANDS (device-only, state plainly):** DeviceOrientation permission
   flow, compass accuracy/drift, camera preview + crosshair sweep, the polar-align
-  "point to pole" aid, iPad pinch/scroll feel, PWA install + offline.
+  "point to pole" aid (built v2.3.0 — the lock/marker FEEL is the device half),
+  iPad pinch/scroll feel, PWA install + offline.
 - Walk the full first-run journey (no sites yet) before any handoff; honest dead-end
   when no site/horizon exists.
 
 ## Releases
+- **v2.3.0 — 2026-07-18** (SW cache `horizon-v29`). **"Point to the pole" live
+  aid** — the last unbuilt half of Polar Align, assembled from the shipped AR
+  stack. New `ui/polaraim.js` (`#/polar/aim`, hero CTA on the Polar tab): hold
+  the phone along the mount's polar axis and a circled-crosshair NCP/SCP marker,
+  Polaris/σ Oct on its dashed daily circle, and the measured-horizon treeline
+  draw over the camera; live "34° left · 12° up" guidance locks ON TARGET with
+  2°/3° hysteresis (acquire/lose transitions announce via role=status; the
+  60 Hz readout stays silent text; on-target = ring weight + ✓ + text, never
+  colour-alone). Behind-the-treeline warning carried over from the Polar tab.
+  Aim math (`aimError`/`aimGuidance`/`poleCirclePoints`) is headless in
+  `model/polar.js`; camera/orientation forked from `ui/sky.js` incl. the v2.0.1
+  iOS pitch anchor. No camera → a static aim-by-the-numbers panel (what the
+  headless gates audit). No new CSS tokens or contrast pairs. The smoke step
+  derives its lock-on orientation from the page's own declination/latitude
+  readouts. 136 unit, 50 contrast, 21 smoke, 0 axe (32 scans). The on-device
+  lock FEEL is NEEDS-HIS-HANDS on staging.
 - **v2.2.0 — 2026-07-18** (SW cache `horizon-v28`). **Full Astro weather** —
   Noah's Clear Sky Chart reference made native. The block under the night graph
   now carries, on the same hour axis: clouds hi/mid/lo (Open-Meteo, hourly),

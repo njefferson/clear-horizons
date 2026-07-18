@@ -8,7 +8,10 @@ globalThis.localStorage = (() => {
 })();
 
 const { makeObserver, starHourAngle } = await import('../src/model/astro.js');
-const { polarAlignment, poleAimFor, poleStarFor, POLARIS, SIGMA_OCTANTIS } = await import('../src/model/polar.js');
+const {
+  polarAlignment, poleAimFor, poleStarFor, POLARIS, SIGMA_OCTANTIS,
+  aimError, aimGuidance, poleCirclePoints, AIM_ENTER_DEG, AIM_EXIT_DEG,
+} = await import('../src/model/polar.js');
 
 const NORTH = { lat: 37.5, lon: -122.0, horizon: null };   // mid-northern site
 const SOUTH = { lat: -33.9, lon: 151.2, horizon: null };   // Sydney-ish
@@ -119,6 +122,88 @@ test('horizon-aware: a flat horizon leaves the pole clear; a tall treeline block
   assert.ok(blocked.poleClearance < 0);
   assert.ok(Math.abs(blocked.horizonAltitudeAtPole - 40) < 1e-9);
   assert.equal(blocked.usable, false);
+});
+
+// --- aim math for the live "point to the pole" aid ---------------------------
+
+test('aimError: zero when the camera sits exactly on the aim point', () => {
+  const e = aimError({ az: 0, alt: 37.5 }, { azimuth: 0, altitude: 37.5 });
+  assert.equal(e.dAz, 0);
+  assert.equal(e.dAlt, 0);
+  assert.equal(e.separationDeg, 0);   // (made to fail once with 1 — it did)
+});
+
+test('aimError: azimuth difference wraps through north', () => {
+  // Camera at az 359°, pole at 0° → the pole is 1° to the RIGHT, not 359° left.
+  const e = aimError({ az: 359, alt: 37.5 }, { azimuth: 0, altitude: 37.5 });
+  assert.ok(Math.abs(e.dAz - 1) < 1e-9, `dAz ${e.dAz}`);
+  // And the other way across the seam: camera 1°, pole 359° → 2° LEFT.
+  const w = aimError({ az: 1, alt: 37.5 }, { azimuth: 359, altitude: 37.5 });
+  assert.ok(Math.abs(w.dAz + 2) < 1e-9, `dAz ${w.dAz}`);
+});
+
+test('aimError: sign conventions — pole right/above ⇒ positive', () => {
+  const e = aimError({ az: 350, alt: 20 }, { azimuth: 10, altitude: 37.5 });
+  assert.ok(e.dAz > 0, 'pole to the right → dAz positive');
+  assert.ok(e.dAlt > 0, 'pole above → dAlt positive');
+  const f = aimError({ az: 30, alt: 50 }, { azimuth: 10, altitude: 37.5 });
+  assert.ok(f.dAz < 0 && f.dAlt < 0, 'pole left/below → both negative');
+});
+
+test('aimError: separation scales the azimuth term by cos(altitude)', () => {
+  // At 60° altitude a 10° azimuth difference is only ~5° of sky.
+  const e = aimError({ az: 0, alt: 60 }, { azimuth: 10, altitude: 60 });
+  assert.ok(Math.abs(e.separationDeg - 10 * Math.cos((60 * Math.PI) / 180)) < 0.01, `sep ${e.separationDeg}`);
+  // At the horizon (alt 0) it is the full 10°.
+  const h = aimError({ az: 0, alt: 0 }, { azimuth: 10, altitude: 0 });
+  assert.ok(Math.abs(h.separationDeg - 10) < 1e-9);
+});
+
+test('aimError: southern hemisphere aim (az 180) behaves the same', () => {
+  const e = aimError({ az: 170, alt: 30 }, { azimuth: 180, altitude: 33.9 });
+  assert.ok(e.dAz > 0 && e.dAlt > 0);
+  assert.ok(e.separationDeg > 0 && e.separationDeg < 15);
+});
+
+test('aimGuidance: directional text, quadrant by quadrant', () => {
+  const g = (cam) => aimGuidance(aimError(cam, { azimuth: 0, altitude: 37.5 }), false);
+  assert.match(g({ az: 326, alt: 25.5 }).text, /34° right · 12° up/);
+  assert.match(g({ az: 34, alt: 49.5 }).text, /34° left · 12° down/);
+  // Small errors keep a decimal so the final approach is readable. (5° of
+  // azimuth at alt 37.5° is ~4° of sky — outside the lock, still shown fine.)
+  assert.match(g({ az: 355, alt: 37.5 }).text, /5\.0° right/);
+});
+
+test('aimGuidance: hysteresis — sticky lock between ENTER and EXIT', () => {
+  assert.ok(AIM_ENTER_DEG < AIM_EXIT_DEG);
+  const at = (sep) => ({ dAz: 0, dAlt: sep, separationDeg: sep });
+  const mid = (AIM_ENTER_DEG + AIM_EXIT_DEG) / 2;              // 2.5° — the gap
+  assert.equal(aimGuidance(at(mid), false).onTarget, false);   // approaching: not yet
+  assert.equal(aimGuidance(at(mid), true).onTarget, true);     // holding: still locked
+  assert.equal(aimGuidance(at(AIM_ENTER_DEG - 0.1), false).onTarget, true);   // acquires
+  assert.equal(aimGuidance(at(AIM_EXIT_DEG + 0.1), true).onTarget, false);    // loses
+  assert.equal(aimGuidance(at(1), false).text, 'on target');
+});
+
+test('poleCirclePoints: n points, all one radius from the pole', () => {
+  const pole = { azimuth: 0, altitude: 37.5 };
+  const pts = poleCirclePoints(pole, 0.65, 36);
+  assert.equal(pts.length, 36);
+  for (const p of pts) {
+    assert.ok(p.az >= 0 && p.az < 360);
+    // Round-trip: each circle point sits `radius` from the pole through aimError.
+    const sep = aimError({ az: p.az, alt: p.alt }, pole).separationDeg;
+    assert.ok(Math.abs(sep - 0.65) < 0.02, `sep ${sep} at az ${p.az}`);
+  }
+});
+
+test('poleCirclePoints: azimuth spread widens with altitude (1/cos)', () => {
+  const spread = (alt) => {
+    const pts = poleCirclePoints({ azimuth: 180, altitude: alt }, 1, 72);
+    const az = pts.map((p) => ((p.az - 180 + 540) % 360) - 180);
+    return Math.max(...az) - Math.min(...az);
+  };
+  assert.ok(spread(60) > spread(20) * 1.5, `60°: ${spread(60)} vs 20°: ${spread(20)}`);
 });
 
 test('starHourAngle matches the engine convention and wraps to [0,24)', () => {

@@ -12,6 +12,7 @@ import { renderHorizonEditor } from './ui/horizoneditor.js';
 import { renderTonight } from './ui/nightgraph.js';
 import { renderSites } from './ui/sites.js';
 import { renderPolar } from './ui/polar.js';
+import { renderPolarAim } from './ui/polaraim.js';
 import { renderCapture } from './ui/capture.js';
 import { renderLiveCapture } from './ui/livecapture.js';
 import { renderSky } from './ui/sky.js';
@@ -113,6 +114,7 @@ function render(navigated = true, key = null) {
   if (h.startsWith('#/capture/live')) return done(renderLiveCapture(app, state, nav)); // live-camera AR capture
   if (h.startsWith('#/capture')) return done(renderCapture(app, state, nav)); // sub-view of Horizon, no tab
   if (h.startsWith('#/horizon')) return done(renderHorizonEditor(app, state, nav));
+  if (h.startsWith('#/polar/aim')) return done(renderPolarAim(app, state, nav)); // live pole-aim aid (sub-view of Polar, no tab)
   if (h.startsWith('#/polar')) return done(renderPolar(app, state, nav));
   if (h.startsWith('#/sites')) return done(renderSites(app, state, nav));
   if (h.startsWith('#/settings')) return done(renderSettings(app, state, nav));

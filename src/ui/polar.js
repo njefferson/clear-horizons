@@ -5,9 +5,9 @@
 // treeline to tell you whether you can even SEE the pole from here.
 //
 // Reticle is a hand-rolled SVG clock (no chart library, per NOTES). "Now" drives
-// the reticle position; a Refresh button re-reads the clock. The device-only
-// "point to the pole" live aid (DeviceOrientation + compass) is on the roadmap
-// and is stated plainly rather than faked.
+// the reticle position; a Refresh button re-reads the clock. The live "point to
+// the pole" camera aid lives at #/polar/aim (ui/polaraim.js), entered from the
+// hero button here.
 // =============================================================================
 import { el, clear } from './dom.js';
 import { activeSite } from '../model/sites.js';
@@ -30,6 +30,18 @@ export function renderPolar(app, state, nav) {
 
   app.append(
     header(site, nav),
+    // The live aid — same unmissable full-width CTA shape as Tonight's sky hero.
+    el('button.ng-sky-hero', {
+      onclick: () => nav.go('#/polar/aim'),
+      'aria-label': 'Point to the pole — live camera aid that guides the polar axis onto the celestial pole',
+    }, [
+      el('span.ng-sky-hero-icon', { 'aria-hidden': 'true' }, '🧭'),
+      el('span.ng-sky-hero-text', {}, [
+        el('span.ng-sky-hero-title', {}, 'Point to the pole'),
+        el('span.ng-sky-hero-sub', {}, 'Live camera aid — lock the axis on the pole'),
+      ]),
+      el('span.ng-sky-hero-arrow', { 'aria-hidden': 'true' }, '→'),
+    ]),
     verdictBanner(p, flat, nav),
     aimCard(p),
     reticleCard(p, site, nav),
@@ -37,7 +49,7 @@ export function renderPolar(app, state, nav) {
     el('p.settings-foot', {}, [
       'Reticle shows the sky in a correct-image, naked-eye view (12 o’clock = straight up). ',
       'Most polar scopes invert or mirror — rotate the clock to match your reticle. ',
-      'A live “point to the pole” aid using the phone’s compass is on the roadmap.',
+      'For the rough aim, “Point to the pole” above guides the axis with the phone’s camera and compass.',
     ]),
   );
 }
