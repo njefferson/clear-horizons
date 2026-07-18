@@ -1,6 +1,7 @@
 // Headless unit tests for model/capture.js — the math under sensor capture.
 // Pointing identities, Sun calibration (the compass-truth fix), and the
 // sweep → median-binned profile pipeline, all synthetic.
+// (Seeded-capture tests live at the bottom: profileFromSession with a base.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -8,7 +9,7 @@ import {
   applyOffset, makeSession, addSample, sampleCount,
   coverage, largestGap, profileFromSession,
 } from '../src/model/capture.js';
-import { sampleAt } from '../src/model/horizon.js';
+import { sampleAt, makeHorizon } from '../src/model/horizon.js';
 
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b} (±${tol})`);
 
@@ -128,4 +129,47 @@ test('a synthetic treeline sweep reconstructs the profile; gaps interpolate', ()
   const q = profileFromSession(sparse);
   near(sampleAt(q, 90.5), 5, 0.1, 'halfway between the two sightings');
   assert.throws(() => profileFromSession(makeSession(1)), /no samples/);
+});
+
+// --- seeded capture (v2.11.0): a base profile survives in unswept gaps -------
+test('seeded: swept wedges replace, wide unswept gaps keep the base', () => {
+  // Base: a terrain trace — 5° everywhere on the 10° grid.
+  const base = makeHorizon(Array.from({ length: 36 }, () => 5));
+  // Sweep ONLY the northern semicircle (270°→90° through north) at 20°.
+  const s = makeSession(1);
+  for (let az = 270; az < 360; az++) addSample(s, az + 0.2, 20);
+  for (let az = 0; az < 90; az++) addSample(s, az + 0.2, 20);
+  const p = profileFromSession(s, base);
+  near(sampleAt(p, 0), 20, 0.5, 'swept north = captured');
+  near(sampleAt(p, 45), 20, 0.5, 'swept NE = captured');
+  near(sampleAt(p, 180), 5, 0.5, 'unswept south keeps the terrain base');
+  near(sampleAt(p, 135), 5, 0.5, 'unswept SE keeps the terrain base');
+});
+
+test('seeded: small jitter gaps still smooth over — the base does not leak in', () => {
+  const base = makeHorizon(Array.from({ length: 36 }, () => 40)); // a tall base would be obvious
+  const s = makeSession(1);
+  // Full circle at 10°, except a 8° jitter hole around az 100 (≤ SEED_GAP_DEG).
+  for (let az = 0; az < 360; az++) { if (az < 96 || az > 104) addSample(s, az + 0.2, 10); }
+  const p = profileFromSession(s, base);
+  near(sampleAt(p, 100), 10, 0.5, 'jitter hole interpolates from captured neighbours, not the 40° base');
+});
+
+test('seeded: a single Marked point refines one spot, base everywhere else', () => {
+  const base = makeHorizon(Array.from({ length: 36 }, (_, i) => (i === 18 ? 7 : 3))); // trace: 7° due south
+  const s = makeSession(1);
+  addSample(s, 90.5, 25); // one treetop marked due east
+  const p = profileFromSession(s, base);
+  near(sampleAt(p, 90.5), 25, 0.5, 'the mark wins at its azimuth');
+  near(sampleAt(p, 180), 7, 0.5, 'the traced south ridge survives');
+  near(sampleAt(p, 270), 3, 0.5, 'the rest of the base survives');
+});
+
+test('seeded: no base → original replace-everything behaviour unchanged', () => {
+  const s = makeSession(1);
+  addSample(s, 0.5, 12); addSample(s, 180.5, 4);
+  const withNull = profileFromSession(s, null);
+  const bare = profileFromSession(s);
+  assert.deepEqual(withNull.points, bare.points);
+  near(sampleAt(bare, 90.5), 8, 0.5, 'gap interpolates between captured points');
 });

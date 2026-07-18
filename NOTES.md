@@ -500,6 +500,21 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.11.0 — 2026-07-18** (SW cache `horizon-v43`). **SEEDED capture** — the
+  missing link in Noah's trace → scan → export workflow. Both capture paths
+  (camera + sensor) now save through `profileFromSession(session, base)`:
+  swept 1° bins replace as always, small gaps (≤ SEED_GAP_DEG 15°) still
+  smooth over from captured neighbours, but wider deliberately-unswept sky
+  KEEPS the site's existing horizon — sweep just the treeline and the
+  terrain trace survives everywhere else; a single Marked treetop refines
+  one spot. Gap edges are inclusive-start/exclusive-end: a base point at
+  the first unswept degree is exactly the data being preserved (the step
+  against the last swept bin is truth, not an artifact), and the wrap seam
+  can't resurrect base points inside swept territory. Save/preview copy
+  updated (no more "replaces this site's horizon"). 161 unit (semicircle
+  merge, jitter-gap non-leak, single-mark, no-base unchanged), 50 contrast,
+  **26 smoke** — the new step partial-sweeps magnetic 0–179° (true ≈13–193°
+  after declination) over a traced site and proves az 200 keeps the trace.
 - **v2.10.0 — 2026-07-18** (SW cache `horizon-v42`). **Escape the
   single-point trap** (device pass: "the app only allows 'here' and edits it
   — you can't add or manage points"). Root cause was design debt from the

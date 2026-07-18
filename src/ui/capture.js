@@ -14,7 +14,7 @@
 // =============================================================================
 import { el, clear, toast } from './dom.js';
 import { activeSite, saveSiteHorizon } from '../model/sites.js';
-import { maxAltitude } from '../model/horizon.js';
+import { makeHorizon, maxAltitude } from '../model/horizon.js';
 import { declination, modelExpired } from '../model/geomag.js';
 import {
   headingFromAlpha, applyOffset,
@@ -237,20 +237,24 @@ function applyCard(site, nav) {
     el('div.card-actions', {}, [
       el('button.btn.primary', { onclick: () => {
         if (!cap.session.bins.size) { toast('Nothing recorded yet.'); return; }
-        const profile = profileFromSession(cap.session);
+        // SEEDED save: swept directions replace; unswept sky keeps the site's
+        // existing horizon (a terrain trace, an earlier sweep) — the
+        // trace → scan workflow's missing link.
+        const profile = profileFromSession(cap.session, makeHorizon(site.horizon));
         saveSiteHorizon(site.id, profile);
         toast(`Horizon saved — tallest ${maxAltitude(profile).toFixed(0)}°.`);
         nav.go('#/horizon');
       } }, 'Save measured horizon'),
     ]),
-    el('p.dim.small', {}, 'Gaps you didn’t sweep interpolate between neighbours; touch them up afterwards in the Horizon editor.'),
+    el('p.dim.small', {}, 'Swept directions replace; directions you didn’t sweep keep this site’s existing horizon (small gaps smooth over). Touch up afterwards in the Horizon editor.'),
   ]);
 }
 
 function previewText() {
   if (!cap.session.bins.size) return 'Record a sweep first.';
-  const p = profileFromSession(cap.session);
-  return `Preview: ${p.points.length} points, tallest ${maxAltitude(p).toFixed(0)}°. Replaces this site’s current horizon.`;
+  const site = activeSite();
+  const p = profileFromSession(cap.session, site ? makeHorizon(site.horizon) : null);
+  return `Preview: ${p.points.length} points, tallest ${maxAltitude(p).toFixed(0)}°. Swept directions replace; the rest keeps this site’s horizon.`;
 }
 
 // --- live repaint (targeted writes; the view may be unmounted) -----------------

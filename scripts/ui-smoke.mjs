@@ -308,6 +308,36 @@ await step('terrain map: Esri outage falls back to OpenTopoMap, announced', asyn
   await page.waitForSelector('.hz-svg');
 });
 
+await step('capture: a PARTIAL sweep refines — unswept sky keeps the traced base (seeded)', async () => {
+  // The traced terrain (tallest ~7° due south, ~5° at az 200) is on the site.
+  // Sweep magnetic headings 0–179 at 22° — the declination correction (~+13°
+  // here) makes that TRUE azimuths ≈13–193 — so az 200 stays unswept and must
+  // KEEP the trace while swept wedges replace: the trace → scan missing link.
+  await page.evaluate(() => { location.hash = '#/capture'; });
+  await page.waitForSelector('.cap-live');
+  await page.click('.pa-card .btn:has-text("Enable compass")');
+  await page.click('#cap-rec');
+  await page.evaluate(() => {
+    for (let heading = 0; heading < 180; heading++) {
+      window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', {
+        alpha: (360 - heading) % 360, beta: 112, gamma: 0, absolute: true, // camera 22° up
+      }));
+    }
+  });
+  await page.click('#cap-rec'); // stop — half the circle, deliberately
+  await page.click('.pa-card .btn:has-text("Save measured horizon")');
+  await page.waitForSelector('.hz-svg');
+  const max = await page.$eval('.hz-max', (e) => e.textContent);
+  ok(/tallest 22°/.test(max), `swept semicircle applied (${max})`);
+  const ssw = await page.$eval('.hz-handle[data-i="20"]', (e) => e.getAttribute('aria-valuenow'));
+  ok(ssw === '5', `unswept SSW kept the traced terrain (az 200 = ${ssw}°, expected 5°)`);
+  // Clean the session so the full-circle step below starts fresh.
+  await page.evaluate(() => { location.hash = '#/capture'; });
+  await page.waitForSelector('.cap-live');
+  await page.click('.btn:has-text("Reset sweep")');
+  await page.waitForFunction(() => /0%| 0 /.test(document.querySelector('#cap-cov')?.textContent || ' 0 '));
+});
+
 await step('capture: synthetic sensor sweep bins, covers the circle, saves', async () => {
   // "Measure" now opens the live camera; the sensor sweep is the no-camera
   // backup, reached directly (or via "No-camera mode" from the camera view).

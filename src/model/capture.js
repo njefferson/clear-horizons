@@ -169,16 +169,47 @@ const median = (xs) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
+// Gaps at or under this width are hand jitter — interpolate across them from
+// the captured neighbours, as always. WIDER gaps are deliberately-unswept sky:
+// with a base profile those keep the base (the SEEDED capture of Noah's
+// trace → scan → export workflow, 2026-07-18).
+export const SEED_GAP_DEG = 15;
+
 /**
  * The captured horizon: one point per covered bin (bin-centre azimuth, median
- * altitude). Returns a profile; gaps interpolate naturally via sampleAt().
- * Throws when the session is empty.
+ * altitude). With no `base`, gaps interpolate naturally via sampleAt() — the
+ * original replace-everything behaviour. WITH a `base` profile (the site's
+ * current horizon — e.g. a terrain trace), captured bins still win, but any
+ * unswept gap wider than SEED_GAP_DEG keeps the base's points: sweep the
+ * treeline you care about and the terrain baseline survives everywhere else.
+ * A single Marked point refines just its spot. Throws when the session is empty.
  */
-export function profileFromSession(session) {
+export function profileFromSession(session, base = null) {
   if (!session.bins.size) throw new Error('no samples recorded');
   const points = [...session.bins.entries()].map(([i, alts]) => ({
     az: (i + 0.5) * session.binDeg,
     alt: median(alts),
   }));
+  if (base && Array.isArray(base.points)) {
+    const total = Math.round(360 / session.binDeg);
+    const filled = [...session.bins.keys()].sort((a, b) => a - b);
+    for (let k = 0; k < filled.length; k++) {
+      const cur = filled[k];
+      const next = k + 1 < filled.length ? filled[k + 1] : filled[0] + total; // wrap north
+      const gapDeg = (next - cur - 1) * session.binDeg;
+      if (gapDeg <= SEED_GAP_DEG) continue;
+      // Keep every base point in the gap, edge-inclusive at the start and
+      // exclusive at the end (a base point AT the first unswept degree is
+      // exactly the data being preserved — an abrupt step against the last
+      // swept bin is the truth, not an artifact). End-exclusive keeps the
+      // wrap seam from resurrecting a base point inside swept territory.
+      const startAz = (cur + 1) * session.binDeg;
+      const endAz = next * session.binDeg; // may exceed 360 on the wrap gap
+      for (const p of base.points) {
+        const azU = p.az < startAz ? p.az + 360 : p.az;
+        if (azU >= startAz && azU < endAz) points.push({ az: p.az, alt: p.alt });
+      }
+    }
+  }
   return makeHorizon({ points });
 }

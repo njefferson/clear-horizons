@@ -316,7 +316,11 @@ function resetSweep() {
 
 function save(site, nav) {
   if (!lc || !lc.session.bins.size) { toast('Nothing recorded yet — Mark a point or Record a sweep.'); return; }
-  const profile = profileFromSession(lc.session);
+  // SEEDED save (see model/capture.js SEED_GAP_DEG): swept wedges replace,
+  // deliberately-unswept sky keeps the site's existing horizon — so a camera
+  // pass over just the treeline refines a terrain trace instead of erasing it,
+  // and a single Marked treetop refines one spot.
+  const profile = profileFromSession(lc.session, makeHorizon(site.horizon));
   saveSiteHorizon(site.id, profile);
   toast(`Horizon saved — tallest ${maxAltitude(profile).toFixed(0)}°.`);
   stopLive();
