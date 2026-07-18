@@ -9,11 +9,10 @@ Photography-Studio): free, on-device, offline-first PWA on Cloudflare Pages.
 The AR sky view that used to headline this block SHIPPED as v2.0.0; weather
 shipped as v2.1.0/v2.2.0; the polar "point to the pole" live aid as v2.3.0.
 What's next, in rough order:
-- **Remote-buildable roadmap next-up:** the **map-pin terrain horizon** is now
-  the head of the queue (Leaflet + free Esri imagery + keyless elevation API —
-  distant ridgelines only; trees still need the sensor capture). Beyond it:
-  the stretch capture items (auto-trace sky segmentation, panorama export,
-  per-device FOV calibration).
+- **The planned roadmap is fully shipped as of v2.6.0** (map-pin terrain
+  horizon was the last named item). What remains are the stretch capture
+  ideas: auto-trace sky segmentation, the panorama export, per-device FOV
+  calibration — plus whatever the next device pass surfaces.
 - Device pass through v2.3.0 (incl. the polar-aim lock feel) **done — Noah,
   2026-07-18**. Repo metadata (About fields + v2.0.2 social preview) confirmed
   done the same day — the CLAUDE.md ritual is satisfied for this art rev.
@@ -423,12 +422,14 @@ tools:**
   cutouts (list + detail) precache into the stable `horizon-thumbs-v1` Cache-API
   cache (`model/precache.js`) and survive SW version bumps — offline in the
   field shows real imagery; never-warmed objects keep the honest placeholder.*
-- **Map-pin terrain horizon** (Noah's "10° in 360°" scaling idea): drop pins on a
-  **keyless** satellite map (Leaflet + free Esri imagery — NOT Google Maps, which
-  needs an API key + billing) + a free elevation API to estimate a **terrain**
-  horizon. Caveat to bake in: elevation data has **no trees**, so map-pins only
-  model distant ridgelines; the physical sensor-trace stays the only accurate
-  capture for a tree-ringed yard. Feeds the *same* 36-row model — clean to add.
+- **Map-pin terrain horizon** — SHIPPED v2.6.0 (Noah's "10° in 360°" idea):
+  `#/horizon/map` (from the editor's Map… button) — vendored Leaflet + keyless
+  Esri World Imagery (NOT Google Maps: API key + billing) + Open-Meteo's
+  keyless elevation API. Tap a ridge (or the bearing+distance keyboard form) →
+  `model/terrain.js` computes az/alt with earth-curvature + refraction; Apply
+  writes each pin into its 10° wedge via `setAltitudeAt` — same semantics as a
+  hand-dragged handle. The **no-trees caveat is stated in the UI** ("measure
+  with the camera instead") — pins model distant ridgelines only.
 - **Sky-segmentation capture (v2 stretch)** — daylight panned-video skyline
   threshold → alt/az. Hard parts: per-phone FOV calibration, compass drift.
 
@@ -480,6 +481,24 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.6.0 — 2026-07-18** (SW cache `horizon-v32`). **Map-pin terrain horizon**
+  — the last named roadmap item. `#/horizon/map` from the editor's 🗺 Map…
+  button: vendored Leaflet 1.9.4 (minified ESM + css in `src/vendor/`,
+  dynamic-imported so boot stays light, SW-precached so the view loads
+  offline) over keyless Esri World Imagery (attributed), tap a distant ridge
+  → Open-Meteo elevation (same host as weather — no new connect-src) →
+  `model/terrain.js` computes bearing/distance (haversine + spherical direct)
+  and apparent altitude with earth-curvature dip + standard refraction
+  (k=0.13, R_eff = R/(1−k)); negative altitudes kept (hilltop sites see extra
+  sky). Apply writes each pin into its 10° editor wedge (`setAltitudeAt`) —
+  nothing saved until Apply. Keyboard path: a bearing+distance form adds the
+  same pins with no pointer (the map is never the only way in); pins are text
+  rows; add/remove/apply announce via role=status; the **no-trees caveat is
+  in the UI**, linking to camera capture. CSP img-src += arcgisonline (tiles).
+  154 unit (curvature/wedge fail-once), 50 contrast (no new pairs), 23 smoke
+  (mocked tiles + deterministic elevation; wedge-replacement asserted on the
+  editor), 0 axe (34 scans — Leaflet controls included). NEEDS-HIS-HANDS:
+  real map feel on the phone + a sanity pin on a known local ridge.
 - **v2.5.0 — 2026-07-18** (SW cache `horizon-v31`). **Framing overlay +
   offline favourite precache** — the last two small roadmap stubs, one
   surface. The details image now draws the ACTIVE instrument's FOV rectangle

@@ -191,6 +191,7 @@ export function renderHorizonEditor(app, state, nav) {
     el('button.chip.ng-site', { onclick: () => nav.go('#/sites'), 'aria-label': `Site: ${site.name} — change` },
       [el('span', { 'aria-hidden': 'true' }, `📍 ${site.name}`)]),
     el('button.btn.primary', { onclick: () => nav.go('#/capture/live'), 'aria-label': 'Measure horizon with the live camera' }, '📷 Measure…'),
+    el('button.btn', { onclick: () => nav.go('#/horizon/map'), 'aria-label': 'Estimate distant ridgelines from a satellite map' }, '🗺 Map…'),
     el('button.btn', { onclick: () => { if (confirm('Reset the horizon to a flat 0°?')) { profile.points = [{ az: 0, alt: 0 }]; persist(); redraw(); toast('Horizon reset to flat.'); } } }, 'Reset'),
     el('button.btn', { onclick: () => openImport(profile, redraw, persist) }, 'Import…'),
     el('button.btn', { onclick: () => exportStellarium(profile, site.name) }, 'Export'),

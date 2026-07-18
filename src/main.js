@@ -9,6 +9,7 @@ import { mountThemeToggle } from './ui/theme.js';
 import { renderTargets } from './ui/targets.js';
 import { renderSettings } from './ui/settings.js';
 import { renderHorizonEditor } from './ui/horizoneditor.js';
+import { renderTerrainMap } from './ui/terrainmap.js';
 import { renderTonight } from './ui/nightgraph.js';
 import { renderSites } from './ui/sites.js';
 import { renderPolar } from './ui/polar.js';
@@ -115,6 +116,7 @@ function render(navigated = true, key = null) {
   if (h.startsWith('#/sky')) return done(renderSky(app, state, nav)); // AR arcs-across-the-sky view (no tab; from Tonight)
   if (h.startsWith('#/capture/live')) return done(renderLiveCapture(app, state, nav)); // live-camera AR capture
   if (h.startsWith('#/capture')) return done(renderCapture(app, state, nav)); // sub-view of Horizon, no tab
+  if (h.startsWith('#/horizon/map')) return done(renderTerrainMap(app, state, nav)); // map-pin terrain horizon (sub-view, no tab)
   if (h.startsWith('#/horizon')) return done(renderHorizonEditor(app, state, nav));
   if (h.startsWith('#/polar/aim')) return done(renderPolarAim(app, state, nav)); // live pole-aim aid (sub-view of Polar, no tab)
   if (h.startsWith('#/polar')) return done(renderPolar(app, state, nav));

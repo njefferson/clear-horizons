@@ -80,7 +80,7 @@ page.on('console', (m) => {
   // placeholder on error). Everything else is a real error.
   const t = m.text();
   const at = `${m.location()?.url || ''} ${t}`;
-  const external = /fonts\.g(oogleapis|static)\.com|alasky\.u-strasbg\.fr|hips2fits|wikipedia\.org|open-meteo\.com|7timer\.info/.test(at);
+  const external = /fonts\.g(oogleapis|static)\.com|alasky\.u-strasbg\.fr|hips2fits|wikipedia\.org|open-meteo\.com|7timer\.info|arcgisonline\.com/.test(at);
   if (m.type() === 'error' && !external) pageErrors.push(t);
 });
 page.on('dialog', (d) => d.accept()); // confirm() on remove/reset
@@ -94,6 +94,17 @@ await page.route(/fonts\.g(oogleapis|static)\.com/, (r) => r.abort());
 const JPG1PX = Buffer.from(
   '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q==', 'base64');
 await page.route(/alasky\.u-strasbg\.fr/, (r) => r.fulfill({ contentType: 'image/jpeg', body: JPG1PX }));
+// Terrain-map fixtures: 1×1 PNG tiles, and a deterministic elevation model —
+// the site (Smoke Yard, 37.5/-122) sits at 100 m, everywhere else at 600 m.
+const PNG1PX = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+await page.route(/server\.arcgisonline\.com/, (r) => r.fulfill({ contentType: 'image/png', body: PNG1PX }));
+await page.route(/api\.open-meteo\.com\/v1\/elevation/, (r) => {
+  const u = new URL(r.request().url());
+  const lats = u.searchParams.get('latitude').split(',');
+  const isSite = (lat, i) => lat === '37.50000' && u.searchParams.get('longitude').split(',')[i] === '-122.00000';
+  r.fulfill({ contentType: 'application/json', body: JSON.stringify({ elevation: lats.map((la, i) => (isSite(la, i) ? 100 : 600)) }) });
+});
 // Deterministic cloud forecast: fulfil the Open-Meteo forecast call with a
 // synthetic ramp spanning ±48 h of "now", so the Tonight cloud strip renders
 // the same way on every run (no sandbox network, no real weather).
@@ -200,6 +211,42 @@ await step('horizon editor: Stellarium import (keeps the file\'s density)', asyn
   await page.waitForSelector('.hz-dialog', { state: 'detached' });
   const max = await page.$eval('.hz-max', (e) => e.textContent);
   ok(/tallest 20°/.test(max), `tallest after import: ${max}`);
+});
+
+await step('terrain map: keyboard pin computes az/alt from elevation; apply sets the wedge', async () => {
+  // Entered from the Horizon editor's Map… button; #/horizon/map must route
+  // before #/horizon (the capture/live precedent).
+  await page.click('.hz-actions .btn:has-text("Map")');
+  await page.waitForFunction(() => location.hash.startsWith('#/horizon/map'));
+  await page.waitForSelector('.tm-map.leaflet-container'); // Leaflet classes the map div itself
+  ok(/no trees/i.test(await page.$eval('.sky-notice', (e) => e.textContent)), 'tree caveat stated plainly');
+  ok(/Esri/.test(await page.$eval('.leaflet-control-attribution', (e) => e.textContent)), 'Esri imagery attributed');
+
+  // The KEYBOARD path (the map is never the only way in): bearing 183°,
+  // distance 8 km → site elev 100 m, ridge 600 m ⇒ atan((498 − 4.4 m drop)/8000)
+  // ≈ 3.5°, landing on the 180° editor wedge.
+  await page.fill('.tm-form input[placeholder="183"]', '183');
+  await page.fill('.tm-form input[placeholder="8.0"]', '8');
+  await page.click('.tm-form .btn[type="submit"]');
+  await page.waitForFunction(() => /az 183°/.test(document.querySelector('.tm-pins')?.textContent || ''));
+  const row = await page.$eval('.tm-pins', (e) => e.textContent);
+  ok(/alt 3\.5° · 8\.0 km · elev 600 m/.test(row), `pin row computes: ${row}`);
+  ok(/Pin added/.test(await page.$eval('#tm-status', (e) => e.textContent)), 'add announced via role=status');
+
+  // Pointer path: a map click drops a pin too (elevation mocked to 600 m).
+  await page.click('.tm-map', { position: { x: 60, y: 60 } });
+  await page.waitForFunction(() => document.querySelectorAll('.tm-pins .tm-pin').length === 2);
+  // Remove the map pin (its distance is viewport-dependent) — keep it deterministic.
+  await page.click('.tm-pins .tm-pin:nth-child(2) .btn');
+  await page.waitForFunction(() => document.querySelectorAll('.tm-pins .tm-pin').length === 1);
+
+  await shot('terrain-map.png');
+  await page.click('#tm-apply');
+  await page.waitForSelector('.hz-svg'); // lands back on the editor
+  // The 183° pin replaced the imported 180°→20° point with 3.5°; the imported
+  // 0°→12° point is now the tallest — the wedge semantics, visible.
+  const max = await page.$eval('.hz-max', (e) => e.textContent);
+  ok(/tallest 12°/.test(max), `pin replaced its wedge (tallest now: ${max})`);
 });
 
 await step('capture: synthetic sensor sweep bins, covers the circle, saves', async () => {
