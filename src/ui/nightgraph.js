@@ -41,8 +41,6 @@ const SERIES = ['#3987e5', '#008300', '#d55181', '#c98500', '#199e70', '#d95926'
 // marker shape, drawn on the curve and mirrored in the legend, table and scrub.
 const MARKS = ['circle', 'square', 'triangle', 'diamond', 'plus', 'cross', 'downtri', 'pentagon'];
 const CASE = '#0d1018';           // dark casing stroked under bright curve runs
-const BLOCKED = '#5f6b84';        // up-but-behind-your-horizon runs: a DIM slate grey (+ dashed,
-                                  // so "blocked" never rides on colour alone) — recessive, not loud
 const MAX_TARGETS = 8;
 const seriesMark = (i) => MARKS[i % MARKS.length];
 
@@ -139,7 +137,7 @@ export async function renderTonight(app, state, nav) {
     visibilitySection(series, observer, profile, win, instrument),
     el('p.settings-foot', {}, win.polar
       ? 'The Sun stays up all “night” at this site/date — showing a fixed window.'
-      : `Sunset ${hm(win.sunset)} · sunrise ${hm(win.sunrise)} (device time). Solid colour = clear of your horizon; grey dashed = up but behind your treeline.`));
+      : `Sunset ${hm(win.sunset)} · sunrise ${hm(win.sunrise)} (device time). Each curve shows only while the target is clear of your horizon.`));
 
   function draw() {
     const w = wrap.clientWidth || 640;
@@ -228,24 +226,17 @@ function drawBase(ctx, s, { twilight, series, moonPts }) {
   strokeCurve(ctx, s, moonPts.map((p) => ({ ms: p.ms, alt: p.alt, up: p.alt > 0 })), true);
   ctx.setLineDash([]);
 
-  // Target curves: faint where up-but-blocked, bright where above the horizon.
-  // A dark casing under the bright run keeps every colour legible across all
+  // Target curves are drawn ONLY where the target clears your horizon — the
+  // behind-the-treeline portions simply aren't shown (nothing to observe there).
+  // A dark casing under the bright run keeps every colour legible across the
   // twilight bands, and a marker shape carries identity without colour.
   const labelPeaks = series.length <= 4; // direct labels only when uncluttered
+  ctx.globalAlpha = 1;
   for (const ser of series) {
-    // A dark casing under EVERY drawn segment (faint + solid) guarantees each
-    // line pixel sits on the dark casing colour, not on a light twilight band —
-    // so contrast holds regardless of which band the curve crosses.
-    ctx.globalAlpha = 1; ctx.strokeStyle = CASE; ctx.lineWidth = 4;
-    strokeCurve(ctx, s, ser.pts, true);          // casing under the full up-portion
-    // Up but BEHIND your horizon → neutral grey + dashed: not observable yet.
-    ctx.strokeStyle = BLOCKED; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
-    strokeCurve(ctx, s, ser.pts, true);
-    ctx.setLineDash([]);
     ctx.strokeStyle = CASE; ctx.lineWidth = 4;
     strokeVisible(ctx, s, ser.pts);              // casing under the visible run
     ctx.strokeStyle = ser.color; ctx.lineWidth = 2;
-    strokeVisible(ctx, s, ser.pts);              // above-horizon runs, solid
+    strokeVisible(ctx, s, ser.pts);              // above-horizon runs only, solid
     drawMarksAlong(ctx, s, ser);                 // shape markers on the visible run
     if (labelPeaks) drawPeakLabel(ctx, s, ser);
   }
@@ -475,8 +466,8 @@ const totalEff = (list) => list.reduce((m, iv) => m + (iv.end - iv.start), 0);
 
 function hintText(profile) {
   return [el('span.dim.small', {}, isFlat(profile)
-    ? 'Drag across the graph to read altitudes. Tip: set your horizon so curves get cut by your real treeline.'
-    : 'Drag across the graph to read each target’s altitude and whether it clears your horizon.')];
+    ? 'Drag across the graph to read altitudes. Tip: measure your horizon so curves show only while a target clears your real treeline.'
+    : 'Drag across the graph to read each target’s altitude; curves appear only while the target is clear of your horizon.')];
 }
 
 function noSiteGate(nav) {

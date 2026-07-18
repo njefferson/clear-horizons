@@ -12,17 +12,24 @@ import {
 import { activeSite, saveSiteHorizon } from '../model/sites.js';
 
 // Plot geometry (SVG user units). Altitude grows upward; azimuth left→right. The
-// altitude axis spans ALT_MIN…ALT_MAX so DEPRESSED horizons (downhill, low
-// obstructions below eye level) are drawn and editable, not clamped at 0°.
+// altitude axis floor ADAPTS: 0° for an ordinary skyline, dropping in 30° steps
+// only as far as a DEPRESSED (downhill / below-eye-level) horizon actually goes,
+// so the useful 0–90° range isn't squashed when there's nothing below 0.
 const VB = { w: 720, h: 250 };
 const M = { l: 30, r: 10, t: 10, b: 26 };
 const PW = VB.w - M.l - M.r;
 const PH = VB.h - M.t - M.b;
-const ALT_SPAN = ALT_MAX - ALT_MIN;
 
 const xOf = (az) => M.l + (az / 360) * PW;
-const yOf = (alt) => M.t + (1 - (alt - ALT_MIN) / ALT_SPAN) * PH;
 const CARDINALS = [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W'], [360, 'N']];
+
+// The axis floor for a profile: 0° unless it dips below, then the 30° step at or
+// under its deepest point (clamped to the model floor ALT_MIN).
+function floorFor(profile) {
+  let min = 0;
+  for (const p of profile.points) if (p.alt < min) min = p.alt;
+  return min >= 0 ? 0 : Math.max(ALT_MIN, Math.floor(min / 30) * 30);
+}
 
 // 8-point compass label for an azimuth — used in the slider handles' spoken value.
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -45,6 +52,11 @@ export function renderHorizonEditor(app, state, nav) {
   const profile = makeHorizon(site.horizon);
   const persist = () => saveSiteHorizon(site.id, profile);
 
+  // The axis floor follows the profile (recomputed each redraw so a downward
+  // drag expands it live). yOf reads it, so all geometry tracks the current floor.
+  let floorAlt = floorFor(profile);
+  const yOf = (alt) => M.t + (1 - (alt - floorAlt) / (ALT_MAX - floorAlt)) * PH;
+
   const svgns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgns, 'svg');
   svg.setAttribute('viewBox', `0 0 ${VB.w} ${VB.h}`);
@@ -56,12 +68,18 @@ export function renderHorizonEditor(app, state, nav) {
 
   const mk = (tag, attrs) => { const n = document.createElementNS(svgns, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
 
-  // Gridlines + labels ------------------------------------------------------
-  for (const alt of [-60, -30, 0, 30, 60, 90]) {
-    // The 0° line (true horizon) is emphasised: obstruction above it, downhill below.
-    svg.append(mk('line', { x1: M.l, y1: yOf(alt), x2: VB.w - M.r, y2: yOf(alt), class: alt === 0 ? 'hz-grid hz-grid-zero' : 'hz-grid' }));
-    const al = mk('text', { x: 2, y: yOf(alt) + 3, class: 'hz-axlabel' });
-    al.textContent = `${alt}°`; svg.append(al);
+  // Horizontal altitude gridlines + labels live in a layer rebuilt each redraw,
+  // because the floor (and thus which lines show) adapts to the profile.
+  const gridLayer = mk('g', {});
+  svg.append(gridLayer);
+  function drawGrid() {
+    gridLayer.replaceChildren();
+    for (let alt = floorAlt; alt <= ALT_MAX; alt += 30) {
+      // The 0° line (true horizon) is emphasised: obstruction above, downhill below.
+      gridLayer.append(mk('line', { x1: M.l, y1: yOf(alt), x2: VB.w - M.r, y2: yOf(alt), class: alt === 0 ? 'hz-grid hz-grid-zero' : 'hz-grid' }));
+      const al = mk('text', { x: 2, y: yOf(alt) + 3, class: 'hz-axlabel' });
+      al.textContent = `${alt}°`; gridLayer.append(al);
+    }
   }
   for (const [az, label] of CARDINALS) {
     svg.append(mk('line', { x1: xOf(az), y1: M.t, x2: xOf(az), y2: M.t + PH, class: 'hz-grid' }));
@@ -93,6 +111,10 @@ export function renderHorizonEditor(app, state, nav) {
   const readout = el('span.hz-readout', { 'aria-live': 'polite' }, '');
 
   function redraw() {
+    // Re-fit the floor to the current profile (a downward drag expands it) and
+    // rebuild the gridlines before anything positioned by yOf.
+    floorAlt = floorFor(profile);
+    drawGrid();
     // The curve samples the profile finely (2°) so captured/imported detail
     // between the 36 handles is visible, including any below-0° (depressed)
     // stretches. The obstruction fill runs from the skyline down to the floor.
@@ -102,7 +124,7 @@ export function renderHorizonEditor(app, state, nav) {
       d += `${az ? 'L' : 'M'}${xOf(az).toFixed(1)} ${yOf(alt).toFixed(1)} `;
     }
     line.setAttribute('d', d);
-    area.setAttribute('d', `${d}L${xOf(360).toFixed(1)} ${yOf(ALT_MIN)} L${xOf(0).toFixed(1)} ${yOf(ALT_MIN)} Z`);
+    area.setAttribute('d', `${d}L${xOf(360).toFixed(1)} ${yOf(floorAlt)} L${xOf(0).toFixed(1)} ${yOf(floorAlt)} Z`);
     for (let i = 0; i < N; i++) {
       handles[i].setAttribute('cx', xOf(azForIndex(i)));
       handles[i].setAttribute('cy', yOf(sampleAt(profile, azForIndex(i))));
@@ -115,7 +137,7 @@ export function renderHorizonEditor(app, state, nav) {
   function altFromEvent(e) {
     const r = svg.getBoundingClientRect();
     const svgY = ((e.clientY - r.top) / r.height) * VB.h;
-    const alt = ALT_MIN + (1 - (svgY - M.t) / PH) * ALT_SPAN;
+    const alt = floorAlt + (1 - (svgY - M.t) / PH) * (ALT_MAX - floorAlt);
     return Math.max(ALT_MIN, Math.min(ALT_MAX, alt));
   }
   function indexFromEvent(e) {
