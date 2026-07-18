@@ -26,12 +26,27 @@ import { activeSite, saveSiteHorizon } from '../model/sites.js';
 import { makeHorizon, serializeHorizon } from '../model/horizon.js';
 import { makePin, destPoint, applyPinsToProfile, fetchElevations } from '../model/terrain.js';
 
-// services.arcgisonline.com is the CURRENT host for the classic keyless
-// imagery; the old server.arcgisonline.com REDIRECTS there, and CSP validates
-// every hop of a redirect — pointing at the final host avoids the hop (both
-// hosts stay allow-listed in _headers in case Esri flips the direction).
-const TILES = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const ATTRIB = 'Tiles © Esri — Esri, Maxar, Earthstar Geographics, and the GIS User Community';
+// Tile sources, in preference order, all keyless. Esri's classic imagery
+// endpoint is deprecated ("mature") and failed on a real device (2026-07-18
+// pass) even on the current host, so the view no longer bets on one provider:
+// after repeated tile errors with zero successes it swaps to the next source
+// and says so. OpenTopoMap (OSM + SRTM contours) is arguably the BETTER map
+// for picking ridgelines anyway — contour lines name the ridge heights.
+const SOURCES = [
+  {
+    name: 'Esri satellite imagery',
+    url: 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attrib: 'Tiles © Esri — Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    maxZoom: 17,
+  },
+  {
+    name: 'OpenTopoMap terrain',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attrib: '© OpenStreetMap contributors, SRTM · style © OpenTopoMap (CC-BY-SA)',
+    maxZoom: 15,
+  },
+];
+const FALLBACK_AFTER = 3; // consecutive tile errors (with no success) before swapping
 
 let tm = null; // view state: { site, siteElev, pins:[], map, L, markers:Map }
 let root = null;
@@ -81,8 +96,11 @@ function buildShell(app, site, nav) {
 
   const mapBox = el('div.tm-map', {
     id: 'tm-map', role: 'application',
-    'aria-label': 'Satellite map. Tap a distant ridge to drop a terrain pin. Keyboard users: the bearing and distance form below adds the same pins without the map.',
+    'aria-label': 'Terrain map. Tap a distant ridge to drop a terrain pin. Keyboard users: the bearing and distance form below adds the same pins without the map.',
   });
+  // Tile problems get their own persistent line — never shared with (or
+  // overwritten by) the pin/elevation status below the pins list.
+  const tileStatus = el('p.dim.small', { id: 'tm-tiles', role: 'status', 'aria-live': 'polite' }, '');
 
   // The keyboard path — the same pin math with no pointer.
   const brg = el('input.loc-in', { type: 'number', min: '0', max: '359.9', step: '0.1', placeholder: '183' });
@@ -118,7 +136,7 @@ function buildShell(app, site, nav) {
   }, 'Apply pins to horizon');
 
   root.append(
-    head, caveat, mapBox, form,
+    head, caveat, mapBox, tileStatus, form,
     el('section.tm-listwrap', {}, [el('h2.tm-listhead', {}, 'Pins'), list, statusNode]),
     el('div.card-actions', {}, [apply]),
     el('p.settings-foot', {}, 'Each pin sets its 10° wedge of the horizon — the same as dragging that editor handle. Altitudes include earth curvature and standard refraction. Nothing is saved until you Apply.'),
@@ -141,21 +159,40 @@ async function initMap(site) {
   if (!mounted() || !tm) return;
   tm.L = L;
   const map = L.map('tm-map', { zoomControl: true }).setView([site.lat, site.lon], 12);
-  const tiles = L.tileLayer(TILES, { maxZoom: 17, attribution: ATTRIB }).addTo(map);
-  // A grey map must never be silent: say WHY once, instead of looking broken.
-  let tileFailSaid = false;
-  tiles.on('tileerror', () => {
-    if (tileFailSaid) return;
-    tileFailSaid = true;
-    say('Satellite imagery isn’t loading — check the connection. Pins still work from bearing + distance if elevations load.');
-  });
-  tiles.on('load', () => { tileFailSaid = false; });
+  addTileSource(map, L, 0);
   L.circleMarker([site.lat, site.lon], {
     radius: 7, color: '#0b0e17', weight: 2, fillColor: '#ffd166', fillOpacity: 1,
   }).addTo(map).bindTooltip(site.name);
   map.on('click', (e) => addPinAt({ lat: e.latlng.lat, lon: e.latlng.lng }));
   tm.map = map;
 }
+
+// Add tile source `idx`; on FALLBACK_AFTER errors with zero successful tiles,
+// swap to the next source and announce it. Tile status lives in its OWN line
+// (#tm-tiles) so pin/elevation messages can never overwrite it — the lesson
+// of the v2.6.1 diagnostic, which the elevation message clobbered.
+function addTileSource(map, L, idx) {
+  const s = SOURCES[idx];
+  let errors = 0, anyLoaded = false, swapped = false;
+  const layer = L.tileLayer(s.url, { maxZoom: s.maxZoom, attribution: s.attrib }).addTo(map);
+  // Success only clears the line for the PRIMARY source — after a swap the
+  // "switched to …" note stays, so the topo map never looks unexplained.
+  layer.on('tileload', () => { if (!anyLoaded) { anyLoaded = true; if (idx === 0) tileSay(''); } });
+  layer.on('tileerror', () => {
+    if (anyLoaded || swapped) return;
+    errors++;
+    if (errors < FALLBACK_AFTER) return;
+    if (idx + 1 < SOURCES.length) {
+      swapped = true;
+      map.removeLayer(layer);
+      tileSay(`${s.name} isn’t loading — switched to ${SOURCES[idx + 1].name}.`);
+      addTileSource(map, L, idx + 1);
+    } else {
+      tileSay('No map tiles are loading — imagery may be blocked on this network. The bearing + distance form still works.');
+    }
+  });
+}
+function tileSay(msg) { const n = root && root.querySelector('#tm-tiles'); if (n) n.textContent = msg; }
 
 // The site's ground elevation anchors every pin altitude. The elevation MODEL
 // value (not site.elevation_m, which is often 0/unknown) keeps site and pins

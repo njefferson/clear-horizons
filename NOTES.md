@@ -481,6 +481,24 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.6.2 — 2026-07-18** (SW cache `horizon-v34`). **Terrain tiles: stop
+  betting on one provider.** Noah's second device pass DISPROVED v2.6.1's
+  redirect theory: staging, private tab (no stale SW possible), "Site
+  elevation 433 m" showing (v2.6.1 code confirmed live) — and still grey on
+  the current Esri host. Remaining read: Esri's deprecated keyless endpoint
+  no longer serves this context (unverifiable from the sandbox — Esri is
+  proxy-blocked). Fix is resilience, not another guess: keyless
+  **OpenTopoMap (OSM + SRTM contours)** as an automatic fallback — ≥3 tile
+  errors with zero successes swaps the layer and SAYS SO; if both sources
+  fail, that is announced too. Tile status moved to its OWN
+  role=status line (v2.6.1's message was clobbered by the elevation status —
+  the diagnostic Noah was promised never showed). Contours are arguably the
+  better ridge-picking map anyway. Also: the bearing/distance form is a grid
+  (the flex layout scattered at phone width), CSP img-src +=
+  *.tile.opentopomap.org. Smoke gains a simulated-Esri-outage step
+  (no-store tile fixtures so re-routes actually bite) and the overflow probe
+  learns Leaflet's clipped panes aren't page overflow. 154 unit, 50
+  contrast, 24 smoke, 0 axe (34 scans).
 - **v2.6.1 — 2026-07-18** (SW cache `horizon-v33`). **Terrain-map grey-tiles
   fix** (device pass: "the map loads bare grey"). Root cause (most probable —
   Esri is unreachable from the dev sandbox, stated honestly): the classic

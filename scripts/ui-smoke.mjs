@@ -80,7 +80,7 @@ page.on('console', (m) => {
   // placeholder on error). Everything else is a real error.
   const t = m.text();
   const at = `${m.location()?.url || ''} ${t}`;
-  const external = /fonts\.g(oogleapis|static)\.com|alasky\.u-strasbg\.fr|hips2fits|wikipedia\.org|open-meteo\.com|7timer\.info|arcgisonline\.com/.test(at);
+  const external = /fonts\.g(oogleapis|static)\.com|alasky\.u-strasbg\.fr|hips2fits|wikipedia\.org|open-meteo\.com|7timer\.info|arcgisonline\.com|opentopomap\.org/.test(at);
   if (m.type() === 'error' && !external) pageErrors.push(t);
 });
 page.on('dialog', (d) => d.accept()); // confirm() on remove/reset
@@ -98,7 +98,11 @@ await page.route(/alasky\.u-strasbg\.fr/, (r) => r.fulfill({ contentType: 'image
 // the site (Smoke Yard, 37.5/-122) sits at 100 m, everywhere else at 600 m.
 const PNG1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
-await page.route(/(server|services)\.arcgisonline\.com/, (r) => r.fulfill({ contentType: 'image/png', body: PNG1PX }));
+// no-store: a later step simulates an Esri outage by re-routing these URLs to
+// abort — cached tile responses would bypass that route and hide the outage.
+const tilePng = (r) => r.fulfill({ contentType: 'image/png', headers: { 'cache-control': 'no-store' }, body: PNG1PX });
+await page.route(/(server|services)\.arcgisonline\.com/, tilePng);
+await page.route(/tile\.opentopomap\.org/, tilePng);
 await page.route(/api\.open-meteo\.com\/v1\/elevation/, (r) => {
   const u = new URL(r.request().url());
   const lats = u.searchParams.get('latitude').split(',');
@@ -247,6 +251,31 @@ await step('terrain map: keyboard pin computes az/alt from elevation; apply sets
   // 0°→12° point is now the tallest — the wedge semantics, visible.
   const max = await page.$eval('.hz-max', (e) => e.textContent);
   ok(/tallest 12°/.test(max), `pin replaced its wedge (tallest now: ${max})`);
+});
+
+await step('terrain map: Esri outage falls back to OpenTopoMap, announced', async () => {
+  // Kill the Esri mock (simulating the real 2026-07-18 device failure) and
+  // re-enter the map: after a few tile errors the layer must swap to
+  // OpenTopoMap and say so on the DEDICATED tile-status line (which pin and
+  // elevation messages must never overwrite).
+  await page.unroute(/(server|services)\.arcgisonline\.com/);
+  await page.route(/(server|services)\.arcgisonline\.com/, (r) => r.abort());
+  let otmRequested = false;
+  await page.unroute(/tile\.opentopomap\.org/);
+  await page.route(/tile\.opentopomap\.org/, (r) => { otmRequested = true; tilePng(r); });
+  await page.evaluate(() => { location.hash = '#/horizon/map'; });
+  await page.waitForSelector('.tm-map.leaflet-container');
+  await page.waitForFunction(() => /switched to OpenTopoMap/.test(document.querySelector('#tm-tiles')?.textContent || ''));
+  ok(otmRequested, 'fallback source actually requested');
+  ok(/OpenTopoMap/.test(await page.$eval('.leaflet-control-attribution', (e) => e.textContent)), 'attribution follows the active source');
+  // The elevation status still lands in ITS line without clobbering the tile line.
+  await page.waitForFunction(() => /Site elevation/.test(document.querySelector('#tm-status')?.textContent || ''));
+  ok(/switched to OpenTopoMap/.test(await page.$eval('#tm-tiles', (e) => e.textContent)), 'tile message survives the elevation message');
+  // Restore the Esri mock for any later map visits (overflow probe).
+  await page.unroute(/(server|services)\.arcgisonline\.com/);
+  await page.route(/(server|services)\.arcgisonline\.com/, tilePng);
+  await page.evaluate(() => { location.hash = '#/horizon'; });
+  await page.waitForSelector('.hz-svg');
 });
 
 await step('capture: synthetic sensor sweep bins, covers the circle, saves', async () => {
@@ -679,10 +708,15 @@ await step('no view overflows the page width at phone size (iPhone 12/13/14)', a
   });
   const edgeOver = () => page.evaluate(() => {
     let max = 0;
-    for (const el of document.querySelectorAll('#app, #app *')) max = Math.max(max, Math.ceil(el.getBoundingClientRect().right));
+    for (const el of document.querySelectorAll('#app, #app *')) {
+      // Leaflet positions tiles/panes at world-coordinate offsets inside the
+      // overflow-hidden map box — clipped by design, not a page overflow.
+      if (el.closest('.leaflet-container') && !el.classList.contains('leaflet-container')) continue;
+      max = Math.max(max, Math.ceil(el.getBoundingClientRect().right));
+    }
     return max - window.innerWidth;
   });
-  for (const [label, hash] of [['Capture', '#/capture'], ['Live capture', '#/capture/live'], ['Sky', '#/sky'], ['Polar aim', '#/polar/aim']]) {
+  for (const [label, hash] of [['Capture', '#/capture'], ['Live capture', '#/capture/live'], ['Sky', '#/sky'], ['Polar aim', '#/polar/aim'], ['Terrain map', '#/horizon/map']]) {
     await page.evaluate((h) => { location.hash = h; }, hash);
     await page.waitForTimeout(200);
     const over = await edgeOver();
