@@ -500,6 +500,21 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.14.0 — 2026-07-18** (SW cache `horizon-v46`). **Install promotion**
+  (device-pass gap: nothing prompted users to install the PWA or explained
+  how). New `ui/install.js`: a dismissible nudge on Tonight — "📲 Install
+  this app — works fully offline in the field" — that does the right thing
+  per platform: a REAL Install button where `beforeinstallprompt` exists
+  (Chromium; the event is captured at boot and the mini-infobar suppressed),
+  Share → Add to Home Screen instructions on iOS/iPadOS (detected incl.
+  iPadOS's Mac-masquerading UA via touch points; there is no install API),
+  honest browser-menu guidance elsewhere, and NOTHING once running
+  standalone. `appinstalled` clears state and toasts. Dismissal persists
+  (`horizon.installNudge`). The ⓘ About gains a permanent "Install it"
+  section with all three platforms spelled out. No new tokens/pairs. 172
+  unit, 50 contrast, 26 smoke (generic-copy nudge shown headless, dismissed,
+  persists across reload; About copy), 0 axe (34 scans). NEEDS-HIS-HANDS:
+  iOS shows the Safari instructions, and the nudge is absent once installed.
 - **v2.13.0 — 2026-07-18** (SW cache `horizon-v45`). **Panorama + Stellarium
   landscape export — the headline ask, shipped.** While the live-camera
   sweep records, each orientation sample also paints the centre columns of

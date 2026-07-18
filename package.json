@@ -1,6 +1,6 @@
 {
   "name": "star-horizon-planner",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "private": true,
   "type": "module",
   "description": "Offline-first astronomy planner built around a custom, per-site, physically-measured horizon.",

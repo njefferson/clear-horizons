@@ -20,6 +20,7 @@ import { activeSite } from '../model/sites.js';
 import { nightWindow, darkWindow, sampleTwilight, darknessLevel } from '../model/night.js';
 import { getNightAstro } from '../model/weather.js';
 import { useMyLocation, openLocationSearch } from './location.js';
+import { installNudge } from './install.js';
 
 const HIGHLIGHTS = 6; // brightest targets to preview when nothing is favourited yet
 
@@ -510,6 +511,9 @@ function header(state, nav, site, shown, favCount, previewing) {
       el('button.btn.small' + (site.approx ? '.primary' : ''), { onclick: () => useMyLocation(nav) }, '📍 Use my location'),
       el('button.btn.small', { onclick: () => openLocationSearch(nav) }, '🔎 City or ZIP'),
     ]),
+    // Install promotion (device-pass gap): dismissible; per-platform how;
+    // gone entirely once the app runs standalone.
+    installNudge(nav),
     previewing
       ? el('p.dim.small', {}, ['Tonight’s brightest showpieces above your horizon. ',
           el('button.linklike', { onclick: () => nav.go('#/targets') }, 'Pick your own in Targets'), '.'])

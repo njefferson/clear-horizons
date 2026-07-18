@@ -5,6 +5,7 @@
 // Esc / backdrop-click to close.
 // =============================================================================
 import { el } from './dom.js';
+import { installHelpHTML } from './install.js';
 
 const ABOUT_HTML = `
   <h2>Star Horizon Planner — what it's for</h2>
@@ -15,6 +16,8 @@ const ABOUT_HTML = `
   or drag it by hand — and applies it to every answer: tonight's targets,
   effective rise/set windows, polar alignment, and an AR view of the night's
   arcs over your own sky. Offline-first for the field; exports to Stellarium.</p>
+
+  ${installHelpHTML()}
 
   <h3>The novel ideas</h3>
   <p>1. <strong>"Above MY horizon" visibility</strong> — a target counts as

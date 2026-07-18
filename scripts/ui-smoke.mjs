@@ -169,6 +169,16 @@ await step('boot: 6 tabs, Tonight opens into the sky at the seeded default site'
   ok(/use my location/i.test(await page.$eval('.ng-approx', (e) => e.textContent)), 'approx-location nudge offers geolocation');
   ok(/city or zip/i.test(await page.$eval('.ng-approx', (e) => e.textContent)), 'approx-location nudge offers a city/ZIP search');
   ok(!(await page.$('.dead-end')), 'Tonight is not a dead-end on first run');
+  // Install promotion (device-pass gap): headless Chromium = no install API,
+  // not iOS, not standalone → the generic browser-menu guidance shows.
+  const nudge = await page.$eval('.install-nudge', (e) => e.textContent);
+  ok(/Install this app/.test(nudge) && /works fully offline/.test(nudge), `install nudge present: ${nudge.slice(0, 60)}`);
+  ok(/browser menu/.test(nudge), 'platform-appropriate (generic) instructions shown');
+  await page.click('.install-nudge .btn:has-text("Dismiss")');
+  await page.waitForSelector('.install-nudge', { state: 'detached' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('.ng-approx');
+  ok(!(await page.$('.install-nudge')), 'dismissal persists across a reload');
   // Flat (unmeasured) horizon → an explicit prompt explaining why nothing is
   // greyed as blocked, with a way to measure it.
   ok(/measure horizon/i.test(await page.$eval('.ng-flat', (e) => e.textContent)), 'flat horizon prompts to measure it');
@@ -801,6 +811,7 @@ await step('about: credits visible, scaffold copy gone', async () => {
   ok(!/early scaffold/i.test(text), 'stale scaffold line removed');
   ok(/what it.s for|actually see/i.test(text), 'About leads with the purpose');
   ok(!/roadmap.s top item/i.test(text), 'stale capture-is-roadmap copy gone (it shipped)');
+  ok(/Install it/.test(text) && /Add to Home Screen/.test(text), 'About explains installing, per platform');
   await page.keyboard.press('Escape');
 });
 

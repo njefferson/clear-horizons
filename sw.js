@@ -1,12 +1,12 @@
 // Horizon Planner service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v45'; // app v2.13.0 — panorama + Stellarium landscape export: the sweep paints an equirect strip; zip = ini + image + horizon data
+const CACHE = 'horizon-v46'; // app v2.14.0 — install promotion: dismissible nudge on Tonight + per-platform how in About; nothing when standalone
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',
   './src/ui/dom.js', './src/ui/theme.js', './src/ui/about.js', './src/ui/marks.js',
-  './src/ui/targets.js', './src/ui/settings.js', './src/ui/horizoneditor.js', './src/ui/nightgraph.js', './src/ui/sites.js', './src/ui/polar.js', './src/ui/capture.js', './src/ui/livecapture.js', './src/ui/sky.js', './src/ui/polaraim.js', './src/ui/terrainmap.js', './src/ui/targetdetail.js', './src/ui/location.js',
+  './src/ui/targets.js', './src/ui/settings.js', './src/ui/horizoneditor.js', './src/ui/nightgraph.js', './src/ui/sites.js', './src/ui/polar.js', './src/ui/capture.js', './src/ui/livecapture.js', './src/ui/sky.js', './src/ui/polaraim.js', './src/ui/terrainmap.js', './src/ui/install.js', './src/ui/targetdetail.js', './src/ui/location.js',
   './src/model/astro.js', './src/model/instruments.js', './src/model/catalog.js', './src/model/horizon.js',
   './src/model/night.js', './src/model/visibility.js', './src/model/sites.js', './src/model/polar.js', './src/model/capture.js', './src/model/arproject.js', './src/model/skyview.js', './src/model/thumbnails.js', './src/model/precache.js', './src/model/describe.js', './src/model/geocode.js', './src/model/geomag.js', './src/model/weather.js', './src/model/terrain.js', './src/model/panorama.js', './src/model/zip.js',
   './src/data/instruments.js', './src/data/catalog.json',
