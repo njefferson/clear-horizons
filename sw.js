@@ -1,14 +1,14 @@
 // Horizon Planner service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v26'; // app v2.0.2 — new brand art: star-over-conifer-treeline masters in art/, rasters derived by gen-assets.mjs, icon.svg rebuilt to match
+const CACHE = 'horizon-v27'; // app v2.1.0 — Astroweather first cut: Open-Meteo hourly cloud cover shaded under the night graph on the same hour axis, cached per site/night, ☁ row in the scrub readout
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',
   './src/ui/dom.js', './src/ui/theme.js', './src/ui/about.js', './src/ui/marks.js',
   './src/ui/targets.js', './src/ui/settings.js', './src/ui/horizoneditor.js', './src/ui/nightgraph.js', './src/ui/sites.js', './src/ui/polar.js', './src/ui/capture.js', './src/ui/livecapture.js', './src/ui/sky.js', './src/ui/targetdetail.js', './src/ui/location.js',
   './src/model/astro.js', './src/model/instruments.js', './src/model/catalog.js', './src/model/horizon.js',
-  './src/model/night.js', './src/model/visibility.js', './src/model/sites.js', './src/model/polar.js', './src/model/capture.js', './src/model/arproject.js', './src/model/skyview.js', './src/model/thumbnails.js', './src/model/describe.js', './src/model/geocode.js', './src/model/geomag.js',
+  './src/model/night.js', './src/model/visibility.js', './src/model/sites.js', './src/model/polar.js', './src/model/capture.js', './src/model/arproject.js', './src/model/skyview.js', './src/model/thumbnails.js', './src/model/describe.js', './src/model/geocode.js', './src/model/geomag.js', './src/model/weather.js',
   './src/data/instruments.js', './src/data/catalog.json',
   './src/vendor/astronomy.js',
 ];

@@ -18,11 +18,13 @@ import { activeInstrument } from '../model/instruments.js';
 import { loadCatalog, favoriteIds, shortName } from '../model/catalog.js';
 import { activeSite } from '../model/sites.js';
 import { nightWindow, darkWindow, sampleTwilight } from '../model/night.js';
+import { getNightClouds } from '../model/weather.js';
 import { useMyLocation, openLocationSearch } from './location.js';
 
 const HIGHLIGHTS = 6; // brightest targets to preview when nothing is favourited yet
 
 const H = 320;                    // graph height, CSS px
+const CLOUD_H = 54;               // cloud-strip height, CSS px (3 band rows)
 const M = { l: 32, r: 12, t: 12, b: 24 };
 const ALT_MAX = 90;
 const STEP_MIN = 4;               // sampling cadence for the curves
@@ -140,8 +142,20 @@ export async function renderTonight(app, state, nav) {
   const readout = el('div.ng-readout', { 'aria-live': 'polite' }, hintText(profile));
   const legend = buildLegend(series, moonNow);
 
+  // Cloud strip (roadmap "Astroweather"): hourly Open-Meteo cloud cover shaded
+  // UNDER the graph on the SAME hour axis. Hidden until a forecast (fresh or
+  // cached) exists — offline with no cache, Tonight renders exactly as before.
+  // The canvas is decorative; the summary line + scrub readout are the text
+  // channel (colour/opacity never the sole carrier).
+  const weather = { samples: null };
+  const cloudCv = document.createElement('canvas'); cloudCv.className = 'ng-cloud-canvas';
+  cloudCv.setAttribute('aria-hidden', 'true');
+  const cloudSum = el('div.ng-cloud-sum.dim.small', {}, '');
+  const cloudWrap = el('div.ng-cloud', { hidden: true }, []);
+  cloudWrap.append(cloudCv, cloudSum);
+
   const instrument = activeInstrument();
-  app.append(wrap, legend, readout,
+  app.append(wrap, cloudWrap, legend, readout,
     visibilitySection(series, observer, profile, win, instrument),
     el('p.settings-foot', {}, win.polar
       ? 'The Sun stays up all “night” at this site/date — showing a fixed window.'
@@ -152,9 +166,22 @@ export async function renderTonight(app, state, nav) {
     model.setWidth(w);
     sizeCanvas(base, w, H); sizeCanvas(over, w, H);
     drawBase(base.getContext('2d'), model, { twilight, series, moonPts, win });
+    if (weather.samples) {
+      sizeCanvas(cloudCv, w, CLOUD_H);
+      drawClouds(cloudCv.getContext('2d'), model, weather.samples);
+    }
   }
   draw();
   window.addEventListener('resize', draw, { passive: true });
+
+  // Forecast arrives async; ignore it if the user has already navigated away.
+  getNightClouds({ site, win }).then((samples) => {
+    if (!samples || !app.contains(wrap)) return;
+    weather.samples = samples;
+    cloudWrap.hidden = false;
+    cloudSum.textContent = cloudSummary(samples);
+    draw();
+  }).catch(() => {});
 
   // Scrub — pointer/drag AND keyboard read altitudes at a time.
   const octx = over.getContext('2d');
@@ -163,7 +190,7 @@ export async function renderTonight(app, state, nav) {
     scrubMs = Math.max(model.t0, Math.min(model.t1, ms));
     wrap.setAttribute('aria-valuenow', Math.round(scrubMs / 60000));
     wrap.setAttribute('aria-valuetext', hourLabelFull(scrubMs));
-    drawScrub(octx, model, scrubMs, series, profile, observer, readout);
+    drawScrub(octx, model, scrubMs, series, profile, observer, readout, weather);
   }
   const scrub = (clientX) => scrubTo(model.tOf(clientX - over.getBoundingClientRect().left));
   over.addEventListener('pointerdown', (e) => { over.setPointerCapture(e.pointerId); scrub(e.clientX); });
@@ -304,8 +331,46 @@ function strokeVisible(ctx, s, pts) {
   ctx.stroke();
 }
 
+// --- cloud strip ------------------------------------------------------------
+// Three rows (high/mid/low, sky order) of hour cells whose opacity IS the cloud
+// percentage, over the same time axis as the graph. Opacity is a glance aid
+// only — exact numbers live in the summary line and the scrub readout.
+const CLOUD_ROWS = [['high', 'hi'], ['mid', 'mid'], ['low', 'lo']];
+function drawClouds(ctx, s, samples) {
+  const W = s.W, top = 2, rowH = (CLOUD_H - 2 * top) / 3;
+  ctx.clearRect(0, 0, W, CLOUD_H);
+  ctx.fillStyle = BAND.night;
+  ctx.fillRect(M.l, top, W - M.l - M.r, CLOUD_H - 2 * top);
+  // Hour gridlines, aligned with the graph above.
+  ctx.strokeStyle = GRID;
+  for (let ms = ceilHour(s.t0); ms <= s.t1; ms += 3600000) {
+    const x = s.x(ms);
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, CLOUD_H - top); ctx.stroke();
+  }
+  ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  CLOUD_ROWS.forEach(([band, label], i) => {
+    const y = top + i * rowH;
+    ctx.fillStyle = AXIS; ctx.fillText(label, M.l - 4, y + rowH / 2);
+    for (const p of samples) {
+      const x0 = Math.max(M.l, s.x(p.ms - 1800000)), x1 = Math.min(s.W - M.r, s.x(p.ms + 1800000));
+      if (x1 <= x0) continue;
+      ctx.fillStyle = `rgba(207, 214, 230, ${(p[band] / 100) * 0.85})`; // MOON tone
+      ctx.fillRect(x0, y + 1, x1 - x0, rowH - 2);
+    }
+  });
+}
+
+// One sentence of text carrying what the strip shades (its accessible twin).
+function cloudSummary(samples) {
+  const avg = Math.round(samples.reduce((m, p) => m + p.total, 0) / samples.length);
+  const worst = samples.reduce((a, b) => (b.total > a.total ? b : a), samples[0]);
+  const src = 'Open-Meteo';
+  if (worst.total <= 15) return `Clouds tonight: mostly clear all night (avg ${avg}%) · ${src}`;
+  return `Clouds tonight: avg ${avg}% · worst ${Math.round(worst.total)}% around ${hourLabelFull(worst.ms)} · ${src}`;
+}
+
 // --- scrub overlay ----------------------------------------------------------
-function drawScrub(ctx, s, ms, series, profile, observer, readout) {
+function drawScrub(ctx, s, ms, series, profile, observer, readout, weather) {
   const W = s.W;
   ctx.clearRect(0, 0, W, H);
   const x = s.x(ms);
@@ -319,7 +384,18 @@ function drawScrub(ctx, s, ms, series, profile, observer, readout) {
     if (p.up) drawMark(ctx, ser.mark, x, s.y(p.alt), 4.5, ser.color);
     rows.push({ color: ser.color, mark: ser.mark, name: shortName(ser.target), alt: p.alt, vis: p.vis, up: p.up });
   }
-  readout.replaceChildren(
+  // Cloud reading at the cursor hour (when a forecast is loaded) — the numeric
+  // twin of the shaded strip, announced with the rest of the readout.
+  const wp = weather && weather.samples ? nearest(weather.samples.map((p) => ({ ...p, ms: p.ms })), ms) : null;
+  const cloudRow = wp && Math.abs(wp.ms - ms) <= 45 * 60000
+    ? el('div.ng-ro-row', {}, [
+        el('span.ng-mark', { 'aria-hidden': 'true' }, '☁'),
+        el('span.ng-ro-name', {}, 'clouds'),
+        el('span.ng-ro-alt', {}, `${Math.round(wp.total)}%`),
+        el('span.ng-ro-flag', { class: wp.total <= 30 ? 'ok' : 'no' }, `lo ${Math.round(wp.low)} · mid ${Math.round(wp.mid)} · hi ${Math.round(wp.high)}`),
+      ])
+    : null;
+  readout.replaceChildren(...[
     el('div.ng-ro-time', {}, hourLabelFull(ms)),
     ...rows.map((r) => el('div.ng-ro-row', {}, [
       markSvg(r.mark, r.color),
@@ -328,7 +404,8 @@ function drawScrub(ctx, s, ms, series, profile, observer, readout) {
       el('span.ng-ro-flag', { class: r.up && r.vis ? 'ok' : 'no' },
         !r.up ? '' : r.vis ? 'clear' : 'behind trees'),
     ])),
-  );
+    cloudRow,
+  ].filter(Boolean));
 }
 
 // --- header / gates / legend ------------------------------------------------

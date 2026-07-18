@@ -405,10 +405,11 @@ tools:**
   rectangle (+ mosaic grid) over the object thumbnail. Presets ship in
   `data/instruments.js`; customs persist in `horizon.instruments` and
   export/import with sites so they aren't trapped in one browser.
-- **Weather overlay (Astroweather)** — Noah wants it UNDER the night graph,
-  aligned to the same hour axis: Open-Meteo hourly cloud cover (total/low/mid/
-  high) shaded per hour beneath the curves, then 7Timer seeing/transparency.
-  Cache per site/night. Keyless + CORS-friendly. (Device ask, 2026-07-18.)
+- **Weather overlay (Astroweather)** — cloud cover SHIPPED v2.1.0: Open-Meteo
+  hourly cloud cover (total/low/mid/high) shaded per hour UNDER the night graph
+  on the same hour axis, cached per site/night (`model/weather.js`), numeric ☁
+  row in the scrub readout. Remaining for a later pass: **7Timer seeing/
+  transparency** rows. Keyless + CORS-friendly. (Device ask, 2026-07-18.)
 - **AR sky view with an hour scrubber (Noah: "the last missing piece")** — the
   time-vs-altitude graph can't show an object's ARC across the sky (its az/alt
   path). Wanted: an augmented-reality / planetarium view that shows where each
@@ -482,6 +483,18 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.1.0 — 2026-07-18** (SW cache `horizon-v27`). **Astroweather, first cut**
+  (the roadmap's device ask): Open-Meteo hourly cloud cover under the night
+  graph on the SAME hour axis — a three-row strip (hi/mid/lo, opacity = %),
+  a text summary line ("avg / worst around HH:MM"), and a numeric ☁ row in the
+  scrub readout (opacity is never the sole channel). `model/weather.js`:
+  keyless forecast fetch, fails closed like geocode, one-slot cache per
+  (site, night) in `horizon.weather`, 3 h staleness, stale-beats-nothing
+  offline. CSP `_headers` now carries the app's real external allow-list —
+  api.open-meteo.com (new) plus retro-fixes for geocoding-api.open-meteo.com,
+  en.wikipedia.org (connect-src) and alasky.u-strasbg.fr (img-src), which
+  shipped features already used. 7Timer seeing/transparency remains the next
+  weather pass. 125 unit, 50 contrast, 20 smoke, 0 axe (30 scans).
 - **v2.0.2 — 2026-07-18** (SW cache `horizon-v26`). **New brand art.** AI-generated
   from the brand brief and approved by Noah: glowing gold star over a conifer
   treeline. High-res masters committed under `art/` (never deployed);
