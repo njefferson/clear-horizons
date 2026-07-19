@@ -1,4 +1,6 @@
-# Horizon Planner
+# Clear Horizons
+
+*(formerly Star Horizon Planner — same app, same URL)*
 
 **Plan your night against your *real* horizon — the actual treeline, measured, not a flat 0°.**
 

@@ -131,7 +131,7 @@ export function maybeWelcome(nav) {
     // ⓘ button keeps the full story available forever.
     el('p', {}, [
       'Every astronomy planner assumes a flat horizon — your yard has trees and hills. ',
-      el('strong', {}, 'Star Horizon Planner measures your real horizon'),
+      el('strong', {}, 'Clear Horizons measures your real horizon'),
       ' (from a map, your camera, or by hand) and plans tonight around what you can actually see. More any time under the ⓘ button.',
     ]),
     el('p', {}, 'First, where are you?'),

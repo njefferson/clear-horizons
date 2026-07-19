@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Horizon Planner — astronomy planning around your real sky",
-  "short_name": "Horizon",
+  "name": "Clear Horizons — astronomy planning around your real sky",
+  "short_name": "Horizons",
   "description": "Plan your night against a custom, per-site, physically-measured horizon — not a flat 0° minimum. Instrument-agnostic, offline-first.",
   "lang": "en",
   "dir": "ltr",

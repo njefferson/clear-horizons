@@ -390,7 +390,9 @@ await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep save
       const c = document.createElement('canvas'); c.width = 64; c.height = 64;
       const ctx = c.getContext('2d');
       let hue = 0;
-      setInterval(() => { ctx.fillStyle = `hsl(${(hue += 37) % 360} 80% 60%)`; ctx.fillRect(0, 0, 64, 64); }, 100);
+      const paint = () => { ctx.fillStyle = `hsl(${(hue += 37) % 360} 80% 60%)`; ctx.fillRect(0, 0, 64, 64); };
+      paint(); // frame exists from t=0 — the first interval tick is 100ms out
+      setInterval(paint, 100);
       return c.captureStream(10);
     };
     location.hash = '#/capture/live';
@@ -412,6 +414,13 @@ await step('live camera: mocked stream, AR overlay, keyboard reticle, sweep save
   await page.keyboard.press('Home'); // back to centre so the sweep records the axis
 
   // Same synthetic Android sweep as the sensor path: an 18° south wall.
+  // The sweep is ONE synchronous burst — every event sees the video's
+  // readyState as of burst start, so a not-yet-delivered first frame no-ops
+  // the entire panorama paint. Wait for a real frame before recording.
+  await page.waitForFunction(() => {
+    const v = document.querySelector('.lc-video');
+    return !!v && v.readyState >= 2 && v.videoWidth > 0;
+  });
   await page.click('#lc-rec');
   await page.evaluate(() => {
     for (let heading = 0; heading < 360; heading++) {
@@ -812,6 +821,10 @@ await step('about: credits visible, scaffold copy gone', async () => {
   ok(/what it.s for|actually see/i.test(text), 'About leads with the purpose');
   ok(!/roadmap.s top item/i.test(text), 'stale capture-is-roadmap copy gone (it shipped)');
   ok(/Install it/.test(text) && /Add to Home Screen/.test(text), 'About explains installing, per platform');
+  // v2.15.0 rebrand guard: the app is Clear Horizons everywhere users read.
+  ok(/Clear Horizons/.test(text), 'rebrand: About carries the new name');
+  ok(!/Horizon Planner/i.test(text), 'rebrand: the old name is gone from About');
+  ok(/Clear Horizons/.test(await page.title()), `rebrand: document title renamed (${await page.title()})`);
   await page.keyboard.press('Escape');
 });
 

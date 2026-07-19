@@ -176,7 +176,7 @@ export function exportBundle(nowIso) {
 export function importBundle(text) {
   let b;
   try { b = JSON.parse(text); } catch { throw new Error('not valid JSON'); }
-  if (!b || b.app !== BUNDLE_APP || !Array.isArray(b.sites)) throw new Error('not a Horizon Planner backup');
+  if (!b || b.app !== BUNDLE_APP || !Array.isArray(b.sites)) throw new Error('not a Clear Horizons backup');
   const sites = b.sites.map(normalizeSite);
   persist(sites);
   if (b.activeSite && sites.some((s) => s.id === b.activeSite)) setActiveSite(b.activeSite);

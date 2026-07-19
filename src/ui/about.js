@@ -8,7 +8,7 @@ import { el } from './dom.js';
 import { installHelpHTML } from './install.js';
 
 const ABOUT_HTML = `
-  <h2>Star Horizon Planner — what it's for</h2>
+  <h2>Clear Horizons — what it's for</h2>
   <p><strong>Plan your night around what you can actually see.</strong> Every
   planner assumes a flat 0&deg; horizon; your yard has trees, hills and
   rooflines. This app <strong>measures your real horizon</strong> — trace
@@ -67,7 +67,7 @@ export function mountAbout() {
 
 function openAbout() {
   document.querySelector('.about-dialog')?.remove();
-  const dlg = el('dialog.about-dialog', { 'aria-label': 'About Horizon Planner' }, [
+  const dlg = el('dialog.about-dialog', { 'aria-label': 'About Clear Horizons' }, [
     el('div.about-body', { html: ABOUT_HTML }),
     el('div.about-foot', {}, [
       el('button.btn.ghost', { onclick: () => dlg.close() }, 'Close'),

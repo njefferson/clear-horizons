@@ -1,5 +1,5 @@
 // =============================================================================
-// Horizon Planner — app bootstrap, state, hash routing. Six live tabs:
+// Clear Horizons — app bootstrap, state, hash routing. Six live tabs:
 // Tonight (night graph + visibility), Targets (catalog), Horizon (editor),
 // Polar (horizon-aware alignment), Sites (manager), Settings (instruments).
 // =============================================================================

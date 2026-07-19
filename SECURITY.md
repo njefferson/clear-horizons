@@ -1,6 +1,6 @@
 # Security & privacy
 
-Horizon Planner is a static, offline-first web app. It has **no backend, no
+Clear Horizons is a static, offline-first web app. It has **no backend, no
 accounts, and no analytics** — everything (your sites, horizons, favourites,
 custom instruments) is stored locally in your browser and never leaves your
 device. The only network requests are for the app's own files and the IBM Plex

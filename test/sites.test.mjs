@@ -110,6 +110,6 @@ test('backup bundle round-trips sites, favourites and custom scopes', () => {
 });
 
 test('importBundle rejects a non-backup file', () => {
-  assert.throws(() => importBundle('{"hello":1}'), /not a Horizon Planner backup/);
+  assert.throws(() => importBundle('{"hello":1}'), /not a Clear Horizons backup/);
   assert.throws(() => importBundle('not json'), /not valid JSON/);
 });

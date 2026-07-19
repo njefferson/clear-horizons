@@ -1,7 +1,7 @@
-// Horizon Planner service worker — offline-first for the whole static app.
+// Clear Horizons service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v46'; // app v2.14.0 — install promotion: dismissible nudge on Tonight + per-platform how in About; nothing when standalone
+const CACHE = 'horizon-v47'; // app v2.15.0 — Tier 1 rename: the app is Clear Horizons (repo/URL unchanged; og-image wordmark pending new art)
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',
