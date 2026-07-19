@@ -28,17 +28,18 @@ install promotion (v2.14), and the **Clear Horizons Tier 1 rename**
   `node scripts/gen-assets.mjs`, then the manual Settings → Social preview
   upload ritual (CLAUDE.md). Repo About metadata (description/topics) also
   still says the old name until Tier 2 is decided.
-- **Tier 2 rename — AUTHORIZED ("Tier 2 go", 2026-07-19) and executed as
-  v2.16.0** (see Releases). Code side done: Pages project `clear-horizons`
-  (CI mints it), dual production deploy so the old origin shows the moved
-  banner, all slug/URL references flipped. STILL PENDING NOAH'S HANDS, ask
-  until confirmed (CLAUDE.md ritual): ① GitHub repo rename to
-  `njefferson/clear-horizons` (Settings → General), ② About-gear Website →
-  https://clear-horizons.pages.dev (description/topics carry over — verify),
-  ③ confirm the new URL serves and the old one shows the banner, ④ migrate
-  his own device (export backup on old origin → import on new → reinstall
-  the PWA), ⑤ eventually delete the old Pages project + drop the dual-deploy
-  step. Social preview stays blocked on new wordmark art.
+- **Tier 2 rename — DONE and CONFIRMED** ("Tier 2 go" → v2.16.0; Noah
+  confirmed all four manual steps 2026-07-19: repo renamed to
+  `njefferson/clear-horizons`, About-gear Website set to
+  https://clear-horizons.pages.dev with description/topics intact, both
+  URLs verified in a browser — new one serves, old one shows the moved
+  banner — and his own device migrated via backup export/import +
+  reinstall). v2.16.1 then dropped the transitional dual-deploy: the old
+  `star-horizon-planner` project is FROZEN on its v2.16.0 build, whose only
+  job is the banner. Deleting it is Noah's option (Cloudflare → Workers &
+  Pages → star-horizon-planner → Settings → Delete project) — but it costs
+  nothing and works as a permanent signpost, so leaving it up is the
+  recommendation. Social preview still blocked on new wordmark art.
 - Stretch: auto-trace sky segmentation, per-device FOV calibration — plus
   whatever the next device pass surfaces. Majors are Noah's call.
 - Repo metadata for the CURRENT art rev (About fields + v2.0.2 social
@@ -522,6 +523,13 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.16.1 — 2026-07-19** (SW cache `horizon-v49`). **Old origin frozen.**
+  Noah confirmed every manual Tier 2 step (repo rename, About-gear website,
+  both-URL browser check, his device migrated), so the transitional
+  dual-deploy step is gone from deploy.yml: production now publishes ONLY
+  to `clear-horizons`, and the old `star-horizon-planner` project stays
+  frozen on v2.16.0 — the banner build — as a signpost for stragglers.
+  Workflow-only change; app code untouched.
 - **v2.16.0 — 2026-07-19** (SW cache `horizon-v48`). **Tier 2 rename: the
   app's home is now clear-horizons.pages.dev** (Noah: "Tier 2 go"). Deploys
   now target a NEW Cloudflare Pages project `clear-horizons` — deploy.yml's

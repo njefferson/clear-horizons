@@ -1,7 +1,7 @@
 // Clear Horizons service worker — offline-first for the whole static app.
 // No network APIs are contacted in v1 (astronomy-engine is vendored and runs
 // on-device; Open-Meteo / hips2fits land on the roadmap). Bump CACHE on release.
-const CACHE = 'horizon-v48'; // app v2.16.0 — Tier 2 rename: new home clear-horizons.pages.dev; old origin gets the moved banner (og-image wordmark still pending new art)
+const CACHE = 'horizon-v49'; // app v2.16.1 — Tier 2 confirmed done; old origin frozen on the banner build (og-image wordmark still pending new art)
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './src/styles.css', './src/main.js',
