@@ -526,6 +526,12 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.16.6 — 2026-07-19** (SW cache `horizon-v54`). **What's-new popup points
+  to the ⓘ.** After dismissing the one-time popup, users now know where the
+  notes live: a dim footer line — "read this again any time under the ⓘ button
+  in the top-right corner." Popup-only (the About dialog IS that ⓘ, so the line
+  would be circular there); `whatsNewBody()` stays shared/unchanged, so
+  `WHATSNEW_ID` holds at `'1'` (no re-nag). Smoke asserts the pointer.
 - **v2.16.5 — 2026-07-19** (SW cache `horizon-v53`). **What's-new pops once on
   update.** New `ui/whatsnew.js`: the release notes (rename + reinstall-for-new
   -icon) now appear automatically as a one-time dialog the first time a

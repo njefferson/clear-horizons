@@ -838,6 +838,7 @@ await step("what's new: pops once for a returning user, then never again", async
   const t = await page.$eval('.whatsnew-dialog', (e) => e.textContent);
   ok(/What.s new/i.test(t), "What's-new popped for a returning user");
   ok(/add it again|reinstall/i.test(t), 'popup carries the reinstall note (in-app, no repo link)');
+  ok(/read this again|top-right/i.test(t), 'popup points to the ⓘ button for finding it later');
   await page.click('.whatsnew-dialog .btn.primary'); // Got it
   await page.waitForTimeout(250);
   ok(!(await page.$('.whatsnew-dialog')), 'popup closes on Got it');

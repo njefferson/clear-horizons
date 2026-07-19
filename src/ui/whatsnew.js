@@ -46,7 +46,9 @@ export function maybeWhatsNew() {
 export function openWhatsNew() {
   document.querySelector('.whatsnew-dialog')?.remove();
   const dlg = el('dialog.about-dialog.whatsnew-dialog', { 'aria-label': 'What’s new in Clear Horizons' }, [
-    el('div.about-body', { html: `<h2>What&rsquo;s new</h2>${whatsNewBody()}` }),
+    el('div.about-body', { html: `<h2>What&rsquo;s new</h2>${whatsNewBody()}
+      <p class="dim small">You can read this again any time under the
+      <strong>&#9432;</strong> button in the top-right corner.</p>` }),
     el('div.about-foot', {}, [
       el('button.btn.primary', { onclick: () => dlg.close() }, 'Got it'),
     ]),
