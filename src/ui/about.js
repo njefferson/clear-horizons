@@ -56,6 +56,8 @@ const ABOUT_HTML = `
   <a href="https://github.com/IBM/plex" target="_blank" rel="noopener">IBM Plex</a>
   (OFL&nbsp;1.1). Free, no accounts, no tracking — everything stays on this
   device.</p>
+
+  <p class="about-credits"><a href="https://noahjefferson.pages.dev" target="_blank" rel="noopener">More free tools by Noah Jefferson&nbsp;&#8599;</a></p>
 `;
 
 export function mountAbout() {
