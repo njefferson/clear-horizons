@@ -1,4 +1,17 @@
-# CLAUDE.md — working agreements for this repo
+# CLAUDE.md — working agreements for clear-horizons
+
+> **Inherits the [Universal App Doctrine](https://github.com/njefferson/noahjefferson/blob/main/DOCTRINE.md)**
+> (canonical copy: `DOCTRINE.md` in the noahjefferson hub). Single source of truth
+> for the rules shared across all of Noah's apps — product values, taste,
+> accessibility, honesty, verification, release discipline & taxonomy, licensing
+> (PolyForm Noncommercial), privacy, and the **repo-metadata confirm rule** (§10).
+> **Where anything below overlaps the Doctrine, the Doctrine wins.** The rest of
+> this file is repo-specific.
+>
+> **Never use the AskUserQuestion / choice-popup tool — ever, any repo**
+> (Doctrine §0). Present choices as plain text; Noah replies in his own words.
+
+---
 
 Read `NOTES.md` first (product thesis, build order, accessibility standing
 order, releases). This file records how Claude Code should *behave* here.
