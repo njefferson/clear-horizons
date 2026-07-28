@@ -526,6 +526,28 @@ tools:**
   when no site/horizon exists.
 
 ## Releases
+- **v2.16.9 — 2026-07-28** (SW cache `horizon-v57`). **Text follows your device's
+  font size setting.** All 69 px font-size declarations in `src/styles.css` → rem
+  at a 16px base, plus `html { font-size: 100% }` (which must stay AFTER the
+  `html, body` rule — placing it before pins the root and shrinks every rem).
+  Cross-app sweep the same day (Frame 3.1.3, Studio, Photo Pointer 1.20.3).
+  DELIBERATELY still px: `.hz-axlabel`/`.hz-azlabel` and `.pa-12` — SVG text
+  inside a viewBox, where px is user-units that scale with the chart; rem would
+  pin them to the root and break them at every zoom. Do not "finish the job"
+  on those. The terrain map's Leaflet +/− controls needed a separate override in
+  our own stylesheet (doubled class to beat `.leaflet-touch .leaflet-bar a`);
+  `src/vendor/leaflet.css` stays untouched so a Leaflet update drops in cleanly.
+  VERIFIED with a headless computed-font-size snapshot across 5 routes at a 16px
+  and a 20px browser default (CDP `Page.setFontSizes`): the OLD code failed to
+  scale (17,883/17,883 elements — the bug demonstrated first), the new code is
+  pixel-identical at the default (0 mismatches over 17,840 rendered elements) and
+  scales exactly 1.25× at 20px (0 mismatches). No horizontal overflow at 20px on a
+  390px viewport (WCAG 1.4.10). 175 tests + 50 contrast pairs + 27 UI smoke steps
+  + axe 0 violations across 36 scans. Merged on Noah's "Merge all and I'll report
+  bugs as I find them" — the on-device gate was waived by him for this sweep.
+  KNOWN, pre-existing, NOT changed: ~34 unstyled `<button>` elements sit at
+  Chromium's UA 13.3333px and jump non-proportionally; fixing means `font: inherit`,
+  which changes rendering, so it is a reported item not a silent edit.
 - **v2.16.6 — 2026-07-19** (SW cache `horizon-v54`). **What's-new popup points
   to the ⓘ.** After dismissing the one-time popup, users now know where the
   notes live: a dim footer line — "read this again any time under the ⓘ button
