@@ -567,3 +567,21 @@ a { color: var(--accent-ink); } /* accent-ink, not --accent: links must clear 4.
 .pa-ro-k { color: var(--dim); font-size: 0.75rem; }
 .pa-ro-v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent-ink); }
 .pa-flag { font-size: 0.75rem; color: var(--warn); font-family: var(--mono); margin: 6px 0 0; }
+
+/* The terrain map's +/− controls come from the vendored Leaflet stylesheet,
+   which sizes them in px — so they were the last text on screen that ignored a
+   reader's default font size (MEASURED: everything else scaled, these two did
+   not). Scaling the glyph alone would overflow Leaflet's fixed 30px box, so the
+   box scales with it, which also makes the tap target grow — the right outcome
+   for the same reader. Specificity must beat `.leaflet-touch .leaflet-bar a`
+   (0,3,1), hence the doubled class. The vendored file itself stays untouched so
+   a future Leaflet update drops in cleanly. */
+.leaflet-touch .leaflet-bar a.leaflet-control-zoom-in,
+.leaflet-touch .leaflet-bar a.leaflet-control-zoom-out,
+.leaflet-bar a.leaflet-control-zoom-in,
+.leaflet-bar a.leaflet-control-zoom-out {
+  font-size: 1.375rem;
+  width: 1.875rem;
+  height: 1.875rem;
+  line-height: 1.875rem;
+}
